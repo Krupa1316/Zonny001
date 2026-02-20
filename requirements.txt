@@ -1,0 +1,31 @@
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  Zonny v0.2.0 — Requirements                                     ║
+# ║                                                                  ║
+# ║  Install:   pip install -r requirements.txt                      ║
+# ║  Or global: pip install -e .                                     ║
+# ║                                                                  ║
+# ║  External (NOT pip):                                             ║
+# ║    Ollama  →  https://ollama.com                                 ║
+# ║              ollama pull nemotron-3-nano:latest                  ║
+# ╚══════════════════════════════════════════════════════════════════╝
+
+# ── Web framework & ASGI server ──────────────────────────────────────
+fastapi>=0.129.0
+uvicorn[standard]>=0.40.0
+python-multipart>=0.0.22
+
+# ── HTTP client (Ollama API, CLI→server) ─────────────────────────────
+requests>=2.32.0
+
+# ── Data validation ──────────────────────────────────────────────────
+pydantic>=2.12.0
+
+# ── Vector memory ────────────────────────────────────────────────────
+chromadb>=1.5.0
+sentence-transformers>=5.2.0
+
+# ── PDF ingestion ────────────────────────────────────────────────────
+pypdf>=6.7.0
+
+# ── MCP protocol (Claude Desktop / MCP clients) ──────────────────────
+mcp>=1.26.0

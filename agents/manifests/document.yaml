@@ -1,0 +1,24 @@
+name: document_agent
+description: Answer questions about uploaded documents using vector search.
+
+system_prompt: |
+  You are a document analysis specialist.
+  Use vector search to retrieve relevant content from uploaded PDFs and documents.
+  Analyze the retrieved content carefully and respond concisely.
+  Always cite which document sections you're referencing.
+  If no relevant content is found, say so clearly.
+
+tools:
+  - vector_search
+  - document_chunk
+  - similarity_score
+
+context_scope: isolated
+max_iterations: 4
+priority: high
+enabled: true
+
+metadata:
+  version: "1.0"
+  author: "system"
+  tags: ["rag", "documents", "pdf", "vector"]

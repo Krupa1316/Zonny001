@@ -1,0 +1,22 @@
+name: generalist_agent
+description: General purpose assistant for answering questions and helping users.
+
+system_prompt: |
+  You are a helpful AI assistant with broad knowledge.
+  You can help with general questions, explanations, and guidance.
+  Always be clear, concise, and helpful.
+  If you need specific data or context, request it from other agents.
+
+tools:
+  - llm_generate
+  - web_search
+
+context_scope: shared
+max_iterations: 5
+priority: low
+enabled: true
+
+metadata:
+  version: "1.0"
+  author: "system"
+  tags: ["general", "assistant", "default"]

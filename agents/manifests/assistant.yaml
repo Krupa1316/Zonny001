@@ -1,0 +1,23 @@
+name: assistant_agent
+description: Final response agent that synthesizes information and responds to user.
+
+system_prompt: |
+  You are the final response agent.
+  Your job is to synthesize information from other agents and provide clear answers.
+  Use natural language and be conversational.
+  Structure complex responses with bullet points or numbered lists.
+  Always be helpful and informative.
+
+tools:
+  - llm_generate
+  - format_response
+
+context_scope: shared
+max_iterations: 2
+priority: critical
+enabled: true
+
+metadata:
+  version: "1.0"
+  author: "system"
+  tags: ["response", "synthesis", "final"]
