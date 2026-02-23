@@ -58,7 +58,7 @@ app.add_middleware(
 # Serve the web UI frontend
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 if FRONTEND_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+    app.mount("/frontend", StaticFiles(directory=str(FRONTEND_DIR)), name="frontend")
 
 API_KEY_HEADER = APIKeyHeader(name="Authorization")
 KEY_FILE = Path("key.json")
