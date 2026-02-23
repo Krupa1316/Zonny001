@@ -1,452 +1,489 @@
-/**
- * Zonny Web UI — app.js
- * 
- * Handles:
- *   - API key management (localStorage)
- *   - Agent roster loading + status updates
- *   - SSE streaming from /stream endpoint
- *   - Chat message rendering (markdown-lite)
- *   - Pipeline visualization
- *   - Agent detail sidebar
- *   - Document upload to /v1/upload
- */
+/* ─────────────────────────────────────────────────────────
+   Zonny Web UI — app.js  v0.3.1
+   Fixes:
+     • Chat messages display in correct order
+     • User message shows first, typing indicator then final answer
+     • Agent Conversation tab shows full interrnal discussion
+     • SSE activity feed still visible live during processing
+───────────────────────────────────────────────────────── */
 
 'use strict';
 
-// ─── State ───────────────────────────────────────────────────────────────────
-const state = {
-  apiKey: localStorage.getItem('zonny_api_key') || '',
-  session: `session-${Date.now()}`,
-  agents: [],           // [{name, model, description, status, priority}]
-  selectedAgent: null,  // agent name
-  activeStream: null,   // EventSource
-  agentLogs: {},        // {name: [logEntry, ...]}
-  lastDocId: null,
-};
+// ═══ Config ═══
+const DEFAULT_BASE = 'http://localhost:8000';
 
-// ─── DOM refs ─────────────────────────────────────────────────────────────────
-const $ = id => document.getElementById(id);
+function getBase() { return localStorage.getItem('zonny_server') || DEFAULT_BASE; }
+function getApiKey() { return localStorage.getItem('zonny_api_key') || ''; }
+
+// ═══ DOM refs ═══
 const els = {
-  agentList:        $('agent-list'),
-  chatThread:       $('chat-thread'),
-  activityLog:      $('activity-log'),
-  messageInput:     $('message-input'),
-  sendBtn:          $('send-btn'),
-  settingsBtn:      $('settings-btn'),
-  settingsModal:    $('settings-modal'),
-  apiKeyInput:      $('api-key-input'),
-  saveKeyBtn:       $('save-key-btn'),
-  closeSettingsBtn: $('close-settings-btn'),
-  connectionStatus: $('connection-status'),
-  fileUploadBtn:    $('file-upload-btn'),
-  clearActivityBtn: $('clear-activity-btn'),
-  pipelineTrack:    document.querySelector('.pipeline-track'),
-  detailEmpty:      $('detail-empty'),
-  detailContent:    $('detail-content'),
-  detailAvatar:     $('detail-avatar'),
-  detailName:       $('detail-name'),
-  detailModel:      $('detail-model'),
-  detailTask:       $('detail-task'),
-  detailStatus:     $('detail-status'),
-  detailTools:      $('detail-tools'),
-  detailLog:        $('detail-log'),
+  chatThread: document.getElementById('chat-thread'),
+  activityLog: document.getElementById('activity-log'),
+  chatInput: document.getElementById('chat-input'),
+  sendBtn: document.getElementById('send-btn'),
+  agentRoster: document.getElementById('agent-roster'),
+  statusDot: document.getElementById('status-dot'),
+  settingsBtn: document.getElementById('settings-btn'),
+  settingsModal: document.getElementById('settings-modal'),
+  closeModal: document.getElementById('close-modal'),
+  apiKeyInput: document.getElementById('api-key-input'),
+  saveKeyBtn: document.getElementById('save-key-btn'),
+  serverUrlInput: document.getElementById('server-url-input'),
+  saveUrlBtn: document.getElementById('save-url-btn'),
+  uploadBtn: document.getElementById('upload-btn'),
+  fileInput: document.getElementById('file-input'),
+  clearActivity: document.getElementById('clear-activity'),
+  pipelineBar: document.getElementById('pipeline-bar'),
+  agentDetail: document.getElementById('agent-detail'),
+  agentDetailEmpty: document.getElementById('agent-detail-empty'),
+  detailAvatar: document.getElementById('detail-avatar'),
+  detailName: document.getElementById('detail-name'),
+  detailModel: document.getElementById('detail-model'),
+  detailTask: document.getElementById('detail-task'),
+  detailStatus: document.getElementById('detail-status'),
+  detailLog: document.getElementById('detail-log'),
+  // Conversation tab
+  convoThread: document.getElementById('convo-thread'),
+  convoMeta: document.getElementById('convo-meta'),
+  clearConvo: document.getElementById('clear-convo'),
 };
 
-// ─── API Helpers ─────────────────────────────────────────────────────────────
-const apiHeaders = () => ({
-  'Authorization': state.apiKey,
-  'Content-Type': 'application/json',
-});
+// ═══ State ═══
+let agents = [];
+let selectedAgent = null;
+let agentLogs = {};   // name → [{content, time}]
+let isProcessing = false;
+let lastConversation = [];
 
-async function apiFetch(path, opts = {}) {
-  return fetch(path, {
-    ...opts,
-    headers: { ...(opts.headers || {}), Authorization: state.apiKey },
+// ═══ Tab switching ═══
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(`tab-${tab}`).classList.add('active');
   });
-}
-
-// ─── Agent Roster ─────────────────────────────────────────────────────────────
-async function loadAgents() {
-  if (!state.apiKey) {
-    els.agentList.innerHTML = '<p style="color:var(--text-muted);font-size:12px;padding:8px">Set an API key in settings to load agents.</p>';
-    return;
-  }
-  try {
-    const res = await apiFetch('/agents/status');
-    if (!res.ok) throw new Error(res.status);
-    const data = await res.json();
-    state.agents = data.agents || [];
-    renderAgentRoster();
-    buildPipeline();
-    setConnectionStatus('ok');
-  } catch (e) {
-    setConnectionStatus('err');
-    console.error('Failed to load agents:', e);
-  }
-}
-
-function renderAgentRoster() {
-  els.agentList.innerHTML = '';
-  state.agents.forEach(agent => {
-    const card = document.createElement('div');
-    card.className = `agent-card ${agent.name === state.selectedAgent ? 'selected' : ''}`;
-    card.dataset.name = agent.name;
-    card.setAttribute('role', 'button');
-    card.setAttribute('tabindex', '0');
-    card.innerHTML = `
-      <div class="agent-card-top">
-        <span class="agent-card-name">${formatAgentName(agent.name)}</span>
-        <span class="agent-badge badge-${agent.status || 'idle'}">${agent.status || 'idle'}</span>
-      </div>
-      <div class="agent-model">${agent.model || ''}</div>
-      <div class="agent-progress"><div class="agent-progress-bar"></div></div>
-    `;
-    card.addEventListener('click', () => selectAgent(agent.name));
-    card.addEventListener('keydown', e => { if (e.key === 'Enter') selectAgent(agent.name); });
-    els.agentList.appendChild(card);
-  });
-}
-
-function updateAgentStatus(agentName, status) {
-  const agent = state.agents.find(a => a.name === agentName);
-  if (agent) agent.status = status;
-
-  const card = els.agentList.querySelector(`[data-name="${agentName}"]`);
-  if (!card) return;
-  card.className = `agent-card ${agentName === state.selectedAgent ? 'selected' : ''} ${status === 'idle' ? '' : status}`;
-  const badge = card.querySelector('.agent-badge');
-  if (badge) {
-    badge.className = `agent-badge badge-${status}`;
-    badge.textContent = status;
-  }
-
-  // Update pipeline node
-  const pipeNode = document.querySelector(`.pipeline-node[data-node="${agentName}"]`);
-  if (pipeNode) {
-    pipeNode.className = `pipeline-node ${status === 'active' ? 'active' : status === 'idle' ? '' : 'done'}`;
-  }
-}
-
-function selectAgent(name) {
-  state.selectedAgent = name;
-  // Update card selection
-  document.querySelectorAll('.agent-card').forEach(c => {
-    c.classList.toggle('selected', c.dataset.name === name);
-  });
-  const agent = state.agents.find(a => a.name === name);
-  if (!agent) return;
-  els.detailEmpty.classList.add('hidden');
-  els.detailContent.classList.remove('hidden');
-  els.detailAvatar.textContent = formatAgentName(agent.name)[0].toUpperCase();
-  els.detailName.textContent = formatAgentName(agent.name);
-  els.detailModel.textContent = agent.model || 'unknown';
-  els.detailStatus.textContent = agent.status || 'idle';
-  els.detailTask.textContent = agent.currentTask || '—';
-
-  // Tools from manifest description
-  els.detailTools.innerHTML = '';
-  if (agent.description) {
-    const tools = agent.description.match(/\w+/g)?.slice(0, 5) || [];
-    tools.forEach(t => {
-      const li = document.createElement('li');
-      li.textContent = t;
-      els.detailTools.appendChild(li);
-    });
-  }
-
-  // Activity log
-  const logs = state.agentLogs[name] || [];
-  els.detailLog.innerHTML = logs.slice(-8).map(l => `<li>${escapeHtml(l)}</li>`).join('') || '<li>No activity yet</li>';
-}
-
-// ─── Pipeline ─────────────────────────────────────────────────────────────────
-function buildPipeline() {
-  const track = els.pipelineTrack;
-  // Remove dynamically inserted nodes (keep #pipe-user and #pipe-final)
-  track.querySelectorAll('.pipeline-node:not(#pipe-user):not(#pipe-final)').forEach(n => n.remove());
-
-  const finalNode = $('pipe-final');
-  state.agents.forEach(agent => {
-    const node = document.createElement('div');
-    node.className = 'pipeline-node';
-    node.dataset.node = agent.name;
-    node.innerHTML = `<div class="node-dot"></div><span class="node-label">${formatAgentName(agent.name)}</span>`;
-    track.insertBefore(node, finalNode);
-  });
-}
-
-// ─── Chat ─────────────────────────────────────────────────────────────────────
-function appendMessage(role, content, agentName = null) {
-  // Remove welcome message
-  const welcome = els.chatThread.querySelector('.welcome-msg');
-  if (welcome) welcome.remove();
-
-  const msg = document.createElement('div');
-  msg.className = `chat-msg ${role}`;
-  const avatar = role === 'user' ? '👤' : (agentName ? formatAgentName(agentName)[0] : '⬡');
-  msg.innerHTML = `
-    <div class="chat-avatar">${avatar}</div>
-    <div>
-      <div class="chat-bubble">${markdownLite(content)}</div>
-      ${agentName ? `<div class="bubble-meta">${formatAgentName(agentName)}</div>` : ''}
-    </div>
-  `;
-  els.chatThread.appendChild(msg);
-  els.chatThread.scrollTop = els.chatThread.scrollHeight;
-}
-
-// ─── Activity Feed ───────────────────────────────────────────────────────────
-function appendActivity(agentName, text) {
-  const empty = els.activityLog.querySelector('.activity-empty');
-  if (empty) empty.remove();
-
-  const item = document.createElement('div');
-  item.className = 'activity-item';
-  item.innerHTML = `
-    <div class="activity-dot"></div>
-    <div>
-      <span class="activity-agent">${formatAgentName(agentName)}</span>
-      <span class="activity-text"> — ${escapeHtml(text.slice(0, 120))}${text.length > 120 ? '…' : ''}</span>
-    </div>
-  `;
-  els.activityLog.appendChild(item);
-  els.activityLog.scrollTop = els.activityLog.scrollHeight;
-
-  // Log to detail panel
-  if (!state.agentLogs[agentName]) state.agentLogs[agentName] = [];
-  state.agentLogs[agentName].push(text.slice(0, 80));
-  if (state.agentLogs[agentName].length > 20) state.agentLogs[agentName].shift();
-
-  // Refresh detail if this agent is selected
-  if (state.selectedAgent === agentName) {
-    const logs = state.agentLogs[agentName];
-    els.detailLog.innerHTML = logs.slice(-8).map(l => `<li>${escapeHtml(l)}</li>`).join('');
-  }
-}
-
-// ─── Send Message ─────────────────────────────────────────────────────────────
-async function sendMessage() {
-  const text = els.messageInput.value.trim();
-  if (!text || !state.apiKey) return;
-
-  if (!state.apiKey) {
-    showToast('⚠️ Please set your API key in Settings first!');
-    $('settings-modal').classList.remove('hidden');
-    return;
-  }
-
-  appendMessage('user', text);
-  els.messageInput.value = '';
-  resizeTextarea();
-  setInputDisabled(true);
-
-  // Reset agent statuses
-  state.agents.forEach(a => updateAgentStatus(a.name, 'idle'));
-  $('pipe-user').className = 'pipeline-node active';
-
-  let finalResponse = '';
-
-  // Open SSE stream
-  const url = new URL('/stream', window.location.href);
-  url.searchParams.set('task', text);
-  url.searchParams.set('session', state.session);
-
-  // SSE via fetch (to include auth header)
-  try {
-    const res = await apiFetch(url.toString(), { method: 'GET' });
-    if (!res.ok) throw new Error(`Stream error: ${res.status}`);
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-
-      const lines = buffer.split('\n');
-      buffer = lines.pop(); // Keep incomplete line
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        try {
-          const event = JSON.parse(line.slice(6));
-          handleStreamEvent(event);
-          if (event.type === 'message') finalResponse = event.content;
-        } catch { /* skip parse errors */ }
-      }
-    }
-  } catch (err) {
-    console.error('Stream failed, falling back to /mcp:', err);
-    // Fallback: direct /mcp call
-    try {
-      const res = await apiFetch('/mcp', {
-        method: 'POST',
-        headers: apiHeaders(),
-        body: JSON.stringify({ session: state.session, input: text }),
-      });
-      const data = await res.json();
-      finalResponse = data.response || 'No response.';
-    } catch (e2) {
-      finalResponse = `❌ Error: ${e2.message}`;
-    }
-  }
-
-  if (finalResponse) {
-    appendMessage('agent', finalResponse, 'Zonny');
-    $('pipe-final').className = 'pipeline-node done';
-  }
-
-  state.agents.forEach(a => updateAgentStatus(a.name, 'idle'));
-  setInputDisabled(false);
-  els.messageInput.focus();
-}
-
-function handleStreamEvent(event) {
-  if (!event || !event.type) return;
-
-  switch (event.type) {
-    case 'message':
-      if (event.agent && event.agent !== 'system') {
-        updateAgentStatus(event.agent, 'active');
-        appendActivity(event.agent, event.content || '');
-      }
-      break;
-    case 'thinking':
-      if (event.agent) updateAgentStatus(event.agent, 'thinking');
-      break;
-    case 'complete':
-    case 'done':
-      state.agents.forEach(a => updateAgentStatus(a.name, 'idle'));
-      $('pipe-final').className = 'pipeline-node done';
-      break;
-    case 'error':
-      appendActivity('system', `Error: ${event.content}`);
-      break;
-  }
-}
-
-// ─── Document Upload ──────────────────────────────────────────────────────────
-els.fileUploadBtn.addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  showToast(`📎 Uploading ${file.name}...`);
-
-  const form = new FormData();
-  form.append('file', file);
-  form.append('conversation_id', state.session);
-
-  try {
-    const res = await fetch('/v1/upload', {
-      method: 'POST',
-      headers: { Authorization: state.apiKey },
-      body: form,
-    });
-    const data = await res.json();
-    state.lastDocId = data.document_id;
-    showToast(`✅ Uploaded: ${file.name}`);
-    appendActivity('system', `Document uploaded: ${file.name} (ID: ${data.document_id.slice(0,8)}...)`);
-  } catch (err) {
-    showToast(`❌ Upload failed: ${err.message}`);
-  }
-  e.target.value = '';
 });
 
-// ─── Settings Modal ───────────────────────────────────────────────────────────
-els.settingsBtn.addEventListener('click', () => {
-  els.apiKeyInput.value = state.apiKey;
-  els.settingsModal.classList.remove('hidden');
-});
-
-els.closeSettingsBtn.addEventListener('click', () => els.settingsModal.classList.add('hidden'));
-els.settingsModal.querySelector('.modal-backdrop').addEventListener('click', () => els.settingsModal.classList.add('hidden'));
-
-els.saveKeyBtn.addEventListener('click', () => {
-  const key = els.apiKeyInput.value.trim();
-  state.apiKey = key;
-  localStorage.setItem('zonny_api_key', key);
-  els.settingsModal.classList.add('hidden');
-  loadAgents();
-  showToast('✅ API key saved');
-});
-
-// ─── Input Handling ───────────────────────────────────────────────────────────
-els.messageInput.addEventListener('input', () => {
-  resizeTextarea();
-  els.sendBtn.disabled = !els.messageInput.value.trim() || !state.apiKey;
-});
-
-els.messageInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    if (!els.sendBtn.disabled) sendMessage();
-  }
-});
-
-els.sendBtn.addEventListener('click', sendMessage);
-
-els.clearActivityBtn.addEventListener('click', () => {
-  els.activityLog.innerHTML = '<p class="activity-empty">Agent activity will appear here during processing...</p>';
-  state.agentLogs = {};
-});
-
-function resizeTextarea() {
-  const t = els.messageInput;
-  t.style.height = 'auto';
-  t.style.height = Math.min(t.scrollHeight, 120) + 'px';
-}
-
-function setInputDisabled(disabled) {
-  els.messageInput.disabled = disabled;
-  els.sendBtn.disabled = disabled;
-}
-
-// ─── UI Helpers ───────────────────────────────────────────────────────────────
-function setConnectionStatus(status) {
-  els.connectionStatus.className = `status-dot ${status}`;
-  els.connectionStatus.title = status === 'ok' ? 'Connected' : 'Connection error';
-}
-
-function formatAgentName(name) {
-  return name.replace(/_agent$/, '').replace(/_/g, ' ')
-    .split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
-}
-
-function escapeHtml(str) {
-  return String(str)
+// ═══ Utilities ═══
+function escapeHtml(t) {
+  return t
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function markdownLite(text) {
-  // Very lightweight markdown: code blocks, inline code, bold, italic, line breaks
-  return escapeHtml(text)
-    .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/\n/g, '<br>');
+  let s = escapeHtml(text);
+  // Code blocks
+  s = s.replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+  // Inline code
+  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // Bold
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // Italic
+  s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  // Newlines
+  s = s.replace(/\n/g, '<br>');
+  return s;
 }
 
-function showToast(msg) {
-  const toast = document.createElement('div');
-  toast.className = 'upload-toast';
-  toast.textContent = msg;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 3000);
+function initials(name) {
+  return name.split(/[\s_-]+/).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('');
 }
 
-// ─── Init ─────────────────────────────────────────────────────────────────────
-function init() {
-  // Pre-fill API key if set
-  if (state.apiKey) {
-    els.sendBtn.disabled = false;
-    loadAgents();
-  } else {
-    // Show settings modal on first load
-    setTimeout(() => els.settingsModal.classList.remove('hidden'), 600);
+function timeNow() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function authHeaders() {
+  return { 'Authorization': getApiKey(), 'Content-Type': 'application/json' };
+}
+
+// ═══ Server health check ═══
+async function checkServer() {
+  try {
+    const r = await fetch(`${getBase()}/`, { method: 'GET' });
+    els.statusDot.classList.toggle('offline', !r.ok);
+  } catch {
+    els.statusDot.classList.add('offline');
+  }
+}
+setInterval(checkServer, 30000);
+checkServer();
+
+// ═══ Agent Roster ═══
+async function loadAgents() {
+  try {
+    const r = await fetch(`${getBase()}/agents/status`, {
+      headers: { 'Authorization': getApiKey() }
+    });
+    if (!r.ok) return;
+    const data = await r.json();
+    agents = data.agents || [];
+    renderRoster();
+    renderPipeline();
+  } catch (e) {
+    console.warn('Agent load failed:', e);
   }
 }
 
-init();
+function renderRoster() {
+  els.agentRoster.innerHTML = '';
+  agents.forEach(a => {
+    const card = document.createElement('div');
+    card.className = 'agent-card';
+    card.dataset.name = a.name;
+    card.innerHTML = `
+      <div class="agent-row">
+        <span class="agent-name">${a.name.replace('_agent', '').replace('_', ' ')}</span>
+        <span class="agent-badge" id="badge-${a.name}">IDLE</span>
+      </div>
+      <div class="agent-model">${a.model}</div>`;
+    card.addEventListener('click', () => selectAgent(a));
+    els.agentRoster.appendChild(card);
+  });
+}
+
+function setAgentStatus(name, status) {
+  const badge = document.getElementById(`badge-${name}`);
+  const card = document.querySelector(`[data-name="${name}"]`);
+  if (!badge || !card) return;
+  const labels = { idle: 'IDLE', active: 'ACTIVE', thinking: 'THINKING', done: 'DONE' };
+  badge.textContent = (labels[status] || status).toUpperCase();
+  badge.className = 'agent-badge' + (status === 'active' || status === 'thinking' ? ' active-badge' : '');
+  card.classList.toggle('active', status === 'active' || status === 'thinking');
+}
+
+function resetAllStatuses() {
+  agents.forEach(a => setAgentStatus(a.name, 'idle'));
+}
+
+// ═══ Agent detail (right panel) ═══
+function selectAgent(a) {
+  selectedAgent = a.name;
+  document.querySelectorAll('.agent-card').forEach(c =>
+    c.classList.toggle('selected', c.dataset.name === a.name));
+  els.agentDetail.style.display = 'flex';
+  els.agentDetail.style.flexDirection = 'column';
+  els.agentDetail.style.gap = '14px';
+  els.agentDetailEmpty.style.display = 'none';
+  els.detailAvatar.textContent = initials(a.name);
+  els.detailName.textContent = a.name;
+  els.detailModel.textContent = a.model;
+  renderDetailLog(a.name);
+}
+
+function renderDetailLog(name) {
+  const entries = agentLogs[name] || [];
+  if (entries.length === 0) {
+    els.detailLog.innerHTML = '<span style="font-size:11px;color:var(--text-muted)">No activity yet</span>';
+    return;
+  }
+  els.detailLog.innerHTML = entries.slice(-8).map(e =>
+    `<div class="detail-log-entry" title="${timeNow()}">${escapeHtml(e.substring(0, 140))}${e.length > 140 ? '…' : ''}</div>`
+  ).join('');
+}
+
+// ═══ Pipeline Visualization ═══
+function renderPipeline() {
+  const nodes = ['User', ...agents.map(a => a.name.replace('_agent', '')), 'Final'];
+  els.pipelineBar.innerHTML = nodes.map((n, i) => `
+    <div class="pipe-node" id="pipe-${i}">
+      <div class="pipe-dot" id="pipe-dot-${i}">${i === 0 ? '👤' : i === nodes.length - 1 ? '✓' : initials(n)}</div>
+      <div class="pipe-label">${n}</div>
+    </div>`).join('');
+}
+
+function activatePipeNode(index, done = false) {
+  const dot = document.getElementById(`pipe-dot-${index}`);
+  if (!dot) return;
+  dot.className = 'pipe-dot ' + (done ? 'done' : 'active');
+}
+
+// ═══ Chat Thread ═══
+function removeWelcome() {
+  const w = els.chatThread.querySelector('.welcome-msg');
+  if (w) w.remove();
+}
+
+function appendMessage(role, text, agentName = '') {
+  removeWelcome();
+  const msg = document.createElement('div');
+  msg.className = `chat-msg ${role === 'user' ? 'user' : 'agent'}`;
+  const av = role === 'user' ? 'You' : (agentName ? initials(agentName) : 'Z');
+  const label = role === 'user' ? 'You' : (agentName || 'Zonny');
+  msg.innerHTML = `
+    <div class="chat-avatar">${av}</div>
+    <div>
+      <div class="chat-bubble">${markdownLite(text)}</div>
+      <span class="chat-meta">${label} · ${timeNow()}</span>
+    </div>`;
+  els.chatThread.appendChild(msg);
+  els.chatThread.scrollTop = els.chatThread.scrollHeight;
+  return msg;
+}
+
+function showTyping() {
+  removeWelcome();
+  const el = document.createElement('div');
+  el.className = 'chat-msg agent typing-indicator';
+  el.id = 'typing-bubble';
+  el.innerHTML = `
+    <div class="chat-avatar">Z</div>
+    <div class="chat-bubble">
+      <span class="typing-dot"></span>
+      <span class="typing-dot"></span>
+      <span class="typing-dot"></span>
+    </div>`;
+  els.chatThread.appendChild(el);
+  els.chatThread.scrollTop = els.chatThread.scrollHeight;
+}
+
+function removeTyping() {
+  const t = document.getElementById('typing-bubble');
+  if (t) t.remove();
+}
+
+// ═══ Activity Feed ═══
+function clearHint() {
+  const hint = els.activityLog.querySelector('.activity-hint');
+  if (hint) hint.remove();
+}
+
+function addActivity(agentName, text) {
+  clearHint();
+  const colors = {
+    user: '#f5c842', system: '#555b72',
+  };
+  const cls = agentName === 'user' ? 'user-agent'
+    : agentName === 'system' ? 'system-agent' : '';
+  const item = document.createElement('div');
+  item.className = 'activity-item';
+  const short = text.length > 90 ? text.slice(0, 90) + '…' : text;
+  item.innerHTML = `
+    <div class="activity-dot" style="background:${colors[agentName] || '#7c5cfc'}"></div>
+    <span class="activity-agent ${cls}">${agentName}</span>
+    <span class="activity-text"> — ${escapeHtml(short)}</span>`;
+  els.activityLog.appendChild(item);
+  els.activityLog.scrollTop = els.activityLog.scrollHeight;
+}
+
+// ═══ Agent Conversation Tab ═══
+function renderConversation(conversation, specialist, userQuery) {
+  lastConversation = conversation;
+
+  // Switch meta label
+  els.convoMeta.textContent = `${conversation.length} messages · Specialist: ${specialist || 'auto'}`;
+
+  // Remove empty state
+  const empty = els.convoThread.querySelector('.convo-empty');
+  if (empty) empty.remove();
+
+  // Clear previous
+  els.convoThread.innerHTML = '';
+
+  // User message first
+  const userEl = document.createElement('div');
+  userEl.className = 'convo-msg user-msg';
+  userEl.innerHTML = `
+    <div class="convo-avatar">You</div>
+    <div class="convo-content">
+      <div class="convo-header-row">
+        <span class="convo-agent-name">You</span>
+        <span class="convo-role-tag">USER</span>
+      </div>
+      <div class="convo-bubble">${markdownLite(userQuery)}</div>
+    </div>`;
+  els.convoThread.appendChild(userEl);
+
+  // Agent messages
+  conversation.forEach((msg, i) => {
+    const isAssistant = msg.agent.includes('assistant') || msg.agent === 'synthesiser';
+    const isLast = i === conversation.length - 1;
+
+    if (isAssistant && isLast && conversation.length > 1) {
+      // Add visual separator before final answer
+      const sep = document.createElement('div');
+      sep.className = 'final-separator';
+      sep.textContent = '✓ FINAL ANSWER';
+      els.convoThread.appendChild(sep);
+    }
+
+    const cls = isAssistant ? 'assistant-msg' : 'specialist-msg';
+    const tag = isAssistant ? 'SYNTHESISER' : 'SPECIALIST';
+
+    const el = document.createElement('div');
+    el.className = `convo-msg ${cls}`;
+    el.innerHTML = `
+      <div class="convo-avatar">${initials(msg.agent)}</div>
+      <div class="convo-content">
+        <div class="convo-header-row">
+          <span class="convo-agent-name">${msg.agent}</span>
+          <span class="convo-role-tag">${tag}</span>
+        </div>
+        <div class="convo-bubble">${markdownLite(msg.content)}</div>
+      </div>`;
+    els.convoThread.appendChild(el);
+  });
+
+  els.convoThread.scrollTop = els.convoThread.scrollHeight;
+}
+
+// ═══ Send Message ═══
+async function sendMessage() {
+  const text = els.chatInput.value.trim();
+  if (!text || isProcessing) return;
+
+  const key = getApiKey();
+  if (!key) {
+    alert('Please set your API key in Settings first.');
+    els.settingsModal.classList.remove('hidden');
+    return;
+  }
+
+  isProcessing = true;
+  els.sendBtn.disabled = true;
+  els.chatInput.value = '';
+  els.chatInput.style.height = 'auto';
+
+  // 1. Show user message immediately (correct order)
+  appendMessage('user', text);
+  activatePipeNode(0, true);
+
+  // 2. Show typing indicator while waiting
+  showTyping();
+
+  // 3. Clear previous activity
+  els.activityLog.innerHTML = '';
+  addActivity('user', text);
+
+  try {
+    const response = await fetch(`${getBase()}/mcp`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ session: 'web-' + Date.now(), input: text }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Server error ${response.status}: ${err}`);
+    }
+
+    const data = await response.json();
+
+    // 4. Remove typing, show final answer
+    removeTyping();
+
+    const finalText = data.response || 'No response.';
+    const conversation = data.conversation || [];
+    const specialist = data.specialist || '';
+
+    appendMessage('agent', finalText, 'Zonny');
+    activatePipeNode(agents.length + 1, true);
+
+    // 5. Populate activity feed from conversation transcript
+    conversation.forEach(msg => {
+      addActivity(msg.agent, msg.content.slice(0, 120));
+      // Update agent status badge briefly
+      setAgentStatus(msg.agent, 'done');
+      // Store in agent logs
+      if (!agentLogs[msg.agent]) agentLogs[msg.agent] = [];
+      agentLogs[msg.agent].push(msg.content);
+    });
+
+    // 6. Populate Agent Conversation tab
+    renderConversation(conversation, specialist, text);
+
+    // 7. Update detail if an agent is selected
+    if (selectedAgent && agentLogs[selectedAgent]) {
+      renderDetailLog(selectedAgent);
+    }
+
+    // Specialist pipeline highlight
+    if (specialist) {
+      const aIdx = agents.findIndex(a => a.name === specialist);
+      if (aIdx >= 0) activatePipeNode(aIdx + 1, true);
+      setAgentStatus(specialist, 'done');
+    }
+
+  } catch (err) {
+    removeTyping();
+    appendMessage('agent', `Error: ${err.message}`);
+    addActivity('system', `Error: ${err.message}`);
+  } finally {
+    isProcessing = false;
+    els.sendBtn.disabled = false;
+    resetAllStatuses();
+  }
+}
+
+// ═══ Input auto-resize ═══
+els.chatInput.addEventListener('input', () => {
+  els.chatInput.style.height = 'auto';
+  els.chatInput.style.height = Math.min(els.chatInput.scrollHeight, 120) + 'px';
+});
+
+els.chatInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+els.sendBtn.addEventListener('click', sendMessage);
+
+// ═══ Settings ═══
+els.settingsBtn.addEventListener('click', () => {
+  els.apiKeyInput.value = getApiKey();
+  els.serverUrlInput.value = getBase();
+  els.settingsModal.classList.remove('hidden');
+});
+els.closeModal.addEventListener('click', () => els.settingsModal.classList.add('hidden'));
+els.settingsModal.addEventListener('click', e => { if (e.target === els.settingsModal) els.settingsModal.classList.add('hidden'); });
+els.saveKeyBtn.addEventListener('click', () => {
+  localStorage.setItem('zonny_api_key', els.apiKeyInput.value.trim());
+  loadAgents();
+  els.settingsModal.classList.add('hidden');
+});
+els.saveUrlBtn.addEventListener('click', () => {
+  localStorage.setItem('zonny_server', els.serverUrlInput.value.trim());
+  checkServer();
+  loadAgents();
+  els.settingsModal.classList.add('hidden');
+});
+
+// ═══ Clear buttons ═══
+els.clearActivity.addEventListener('click', () => {
+  els.activityLog.innerHTML = '<p class="activity-hint">Agent activity will appear here during processing…</p>';
+});
+els.clearConvo.addEventListener('click', () => {
+  els.convoThread.innerHTML = `
+    <div class="convo-empty">
+      <div class="welcome-icon">🤝</div>
+      <h3>Agent Conversation</h3>
+      <p>Full internal agent discussion will appear here after you chat.</p>
+    </div>`;
+  els.convoMeta.textContent = 'No conversation yet. Send a message in Chat.';
+});
+
+// ═══ File upload ═══
+els.uploadBtn.addEventListener('click', () => els.fileInput.click());
+els.fileInput.addEventListener('change', async () => {
+  const file = els.fileInput.files[0];
+  if (!file) return;
+  addActivity('system', `Uploading ${file.name}…`);
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const r = await fetch(`${getBase()}/v1/upload`, {
+      method: 'POST',
+      headers: { 'Authorization': getApiKey() },
+      body: form,
+    });
+    const data = await r.json();
+    addActivity('system', `Uploaded: ${file.name} (${data.chunks || '?'} chunks)`);
+  } catch (e) {
+    addActivity('system', `Upload failed: ${e.message}`);
+  }
+  els.fileInput.value = '';
+});
+
+// ═══ Boot ═══
+loadAgents();

@@ -1,158 +1,138 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Zonny — AI Agent Platform</title>
-  <meta name="description" content="Zonny v0.3 — Local multi-LLM agent platform with real-time agent activity visualization" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/frontend/style.css" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
 </head>
+
 <body>
-  <!-- ═══════════════════════════════════════════════════════════ -->
-  <!-- Header -->
-  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- ═══ HEADER ═══ -->
   <header id="app-header">
     <div class="header-brand">
-      <span class="brand-icon">⬡</span>
+      <span class="brand-logo">Z</span>
       <span class="brand-name">Zonny</span>
       <span class="brand-version">v0.3</span>
     </div>
-    <nav class="header-nav">
-      <span id="connection-status" class="status-dot idle" title="Server status"></span>
-      <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
+    <nav class="header-tabs">
+      <button class="tab-btn active" data-tab="chat">💬 Chat</button>
+      <button class="tab-btn" data-tab="convo">🤖 Agent Conversation</button>
     </nav>
+    <div class="header-actions">
+      <span class="status-dot" id="status-dot" title="Server status"></span>
+      <button class="icon-btn" id="settings-btn" title="Settings">⚙</button>
+    </div>
   </header>
 
-  <!-- ═══════════════════════════════════════════════════════════ -->
-  <!-- Settings Modal -->
-  <!-- ═══════════════════════════════════════════════════════════ -->
-  <div id="settings-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-    <div class="modal-backdrop"></div>
-    <div class="modal-box">
-      <h2 id="settings-title">Settings</h2>
-      <label class="field-label" for="api-key-input">API Key</label>
-      <input id="api-key-input" type="password" placeholder="Enter your API key..." spellcheck="false" />
-      <p class="field-hint">Generated via <code>create_key.py</code>. Stored locally in your browser.</p>
-      <div class="modal-actions">
-        <button id="save-key-btn" class="btn-primary">Save Key</button>
-        <button id="close-settings-btn" class="btn-ghost">Cancel</button>
+  <!-- ═══ MAIN LAYOUT ═══ -->
+  <main id="app-main">
+    <!-- LEFT: Agent Roster -->
+    <aside id="left-panel">
+      <div class="panel-label">AGENTS</div>
+      <div id="agent-roster"></div>
+    </aside>
+
+    <!-- CENTER: Tab content -->
+    <section id="center-panel">
+
+      <!-- TAB: Chat -->
+      <div id="tab-chat" class="tab-content active">
+        <!-- Pipeline visualization -->
+        <div id="pipeline-bar"></div>
+
+        <!-- Chat thread -->
+        <div id="chat-thread">
+          <div class="welcome-msg">
+            <div class="welcome-icon">⚡</div>
+            <h2>Ask Zonny anything</h2>
+            <p>Multiple specialized agents work together to answer.</p>
+          </div>
+        </div>
+
+        <!-- Activity feed -->
+        <div id="activity-panel">
+          <div class="activity-header">
+            <span>AGENT ACTIVITY</span>
+            <button class="icon-btn-sm" id="clear-activity" title="Clear activity">✕</button>
+          </div>
+          <div id="activity-log">
+            <p class="activity-hint">Agent activity will appear here during processing…</p>
+          </div>
+        </div>
+
+        <!-- Input bar -->
+        <div id="input-bar">
+          <button id="upload-btn" class="icon-btn" title="Upload document">📎</button>
+          <input type="file" id="file-input" style="display:none" accept=".pdf,.txt,.md,.py,.js" />
+          <textarea id="chat-input" placeholder="Ask anything… (Shift+Enter for newline)" rows="1"></textarea>
+          <button id="send-btn" title="Send">➤</button>
+        </div>
       </div>
+
+      <!-- TAB: Agent Conversation -->
+      <div id="tab-convo" class="tab-content">
+        <div id="convo-header">
+          <div class="convo-meta" id="convo-meta">No conversation yet. Send a message in Chat.</div>
+          <button class="icon-btn-sm" id="clear-convo">✕</button>
+        </div>
+        <div id="convo-thread">
+          <div class="convo-empty">
+            <div class="welcome-icon">🤝</div>
+            <h3>Agent Conversation</h3>
+            <p>Full internal agent discussion will appear here after you chat.</p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- RIGHT: Agent detail -->
+    <aside id="right-panel">
+      <div id="agent-detail-empty">Select an agent to view details</div>
+      <div id="agent-detail" style="display:none">
+        <div class="detail-avatar" id="detail-avatar"></div>
+        <div class="detail-name" id="detail-name"></div>
+        <div class="detail-model" id="detail-model"></div>
+        <div class="detail-section">
+          <div class="detail-label">CURRENT TASK</div>
+          <div class="detail-task" id="detail-task">—</div>
+        </div>
+        <div class="detail-section">
+          <div class="detail-label">STATUS</div>
+          <div class="detail-status" id="detail-status">idle</div>
+        </div>
+        <div class="detail-section">
+          <div class="detail-label">ACTIVITY LOG</div>
+          <div class="detail-log" id="detail-log"></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- ═══ SETTINGS MODAL ═══ -->
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-title">Settings</div>
+      <div class="modal-field">
+        <label>API Key</label>
+        <input type="password" id="api-key-input" placeholder="sk-local-…" />
+        <button id="save-key-btn">Save</button>
+      </div>
+      <div class="modal-field">
+        <label>Server URL</label>
+        <input type="text" id="server-url-input" placeholder="http://localhost:8000" />
+        <button id="save-url-btn">Save</button>
+      </div>
+      <button class="modal-close" id="close-modal">✕</button>
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════════════════ -->
-  <!-- Main Layout -->
-  <!-- ═══════════════════════════════════════════════════════════ -->
-  <main id="app-main">
-
-    <!-- LEFT PANEL — Agent Roster -->
-    <aside id="agent-roster" aria-label="Agent roster">
-      <h3 class="panel-title">Agents</h3>
-      <div id="agent-list">
-        <!-- Populated by JavaScript -->
-        <div class="agent-skeleton"></div>
-        <div class="agent-skeleton"></div>
-        <div class="agent-skeleton"></div>
-      </div>
-    </aside>
-
-    <!-- CENTER PANEL — Chat + Activity Feed -->
-    <section id="center-panel">
-
-      <!-- Pipeline Visualization -->
-      <div id="pipeline-bar" aria-label="Agent pipeline">
-        <div class="pipeline-track">
-          <div class="pipeline-node active" data-node="user" id="pipe-user">
-            <div class="node-dot"></div>
-            <span class="node-label">User</span>
-          </div>
-          <!-- Agent nodes injected by JS -->
-          <div class="pipeline-node" data-node="final" id="pipe-final">
-            <div class="node-dot"></div>
-            <span class="node-label">Final</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Chat Thread -->
-      <div id="chat-thread" role="log" aria-live="polite" aria-label="Conversation">
-        <div class="welcome-msg">
-          <div class="welcome-icon">⬡</div>
-          <h2>Zonny Agent Platform</h2>
-          <p>Multi-LLM agents collaborate to answer your questions. Type a message to begin.</p>
-        </div>
-      </div>
-
-      <!-- Agent Activity Feed -->
-      <div id="activity-feed" aria-label="Agent activity">
-        <div class="activity-header">
-          <span class="activity-title">Agent Activity</span>
-          <button id="clear-activity-btn" class="icon-btn small" title="Clear activity log">×</button>
-        </div>
-        <div id="activity-log">
-          <p class="activity-empty">Agent activity will appear here during processing...</p>
-        </div>
-      </div>
-
-      <!-- Input Bar -->
-      <div id="input-bar">
-        <label for="file-upload-btn" class="icon-btn" title="Upload document" aria-label="Upload document">
-          📎
-          <input id="file-upload-btn" type="file" accept=".pdf,.txt,.md,.py,.js,.ts" hidden />
-        </label>
-        <textarea
-          id="message-input"
-          placeholder="Ask anything... (Shift+Enter for newline)"
-          rows="1"
-          aria-label="Message input"
-          spellcheck="true"
-        ></textarea>
-        <button id="send-btn" class="btn-primary send-btn" aria-label="Send message" disabled>
-          <span class="send-icon">▶</span>
-        </button>
-      </div>
-    </section>
-
-    <!-- RIGHT PANEL — Agent Detail Sidebar -->
-    <aside id="agent-detail" aria-label="Agent detail">
-      <div id="detail-empty" class="detail-placeholder">
-        <p>Select an agent to view details</p>
-      </div>
-      <div id="detail-content" class="hidden">
-        <div class="detail-header">
-          <div class="detail-avatar" id="detail-avatar">G</div>
-          <div>
-            <h3 id="detail-name">Agent Name</h3>
-            <span id="detail-model" class="model-tag">model</span>
-          </div>
-        </div>
-
-        <section class="detail-section">
-          <h4>Current Task</h4>
-          <p id="detail-task" class="detail-value">—</p>
-        </section>
-
-        <section class="detail-section">
-          <h4>Status</h4>
-          <p id="detail-status" class="detail-value">Idle</p>
-        </section>
-
-        <section class="detail-section">
-          <h4>Tool Usage</h4>
-          <ul id="detail-tools" class="tag-list"></ul>
-        </section>
-
-        <section class="detail-section">
-          <h4>Activity Log</h4>
-          <ul id="detail-log" class="activity-items"></ul>
-        </section>
-      </div>
-    </aside>
-
-  </main>
-
-  <script src="/static/app.js"></script>
+  <script src="/frontend/app.js"></script>
 </body>
+
 </html>

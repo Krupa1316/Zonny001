@@ -166,7 +166,7 @@ async def agent_status_list(_: str = Depends(verify_api_key)):
 
 
 # ============================================================
-# MCP Gateway — now backed by AutoGen runtime
+# MCP Gateway — AutoGen runtime
 # ============================================================
 
 @app.post("/mcp")
@@ -206,52 +206,40 @@ async def mcp_gateway(req: MCPRequest, _: str = Depends(verify_api_key)):
 
     # Handle legacy system commands (backwards compatibility)
     if user_input.startswith("/"):
-        command_response = handle_system_command(user_input, req.session, context)
-        if command_response:
-            return {
-                "response": command_response.get("response", ""),
-                "action": command_response.get("action"),
-                "context": context,
-                "mode": "command",
-            }
+        try:
+            from commands.system import handle_system_command
+            command_response = handle_system_command(user_input, req.session, context)
+            if command_response:
+                return {
+                    "response": command_response.get("response", ""),
+                    "action": command_response.get("action"),
+                    "context": context,
+                    "mode": "command",
+                }
+        except ImportError:
+            pass
 
     try:
-        use_autogen = is_complex_task(user_input)
+        # Always route through AutoGen multi-agent team
+        result = await run_team(task=user_input, session_id=req.session)
 
-        if use_autogen:
-            # ═══════════════════════════════════════════════════════
-            # AutoGen Team Mode — multi-model agents collaborate
-            # ═══════════════════════════════════════════════════════
-            result = await run_team(task=user_input, session_id=req.session)
-
-            return {
-                "response": result,
-                "mode": "autogen",
-                "context": context,
-            }
-
-        else:
-            # ═══════════════════════════════════════════════════════
-            # Phase 1 Mode — fast semantic router (unchanged)
-            # ═══════════════════════════════════════════════════════
-            intent = route(user_input, context)
-            result = dispatch(intent, context)
-
-            return {
-                "response": result,
-                "mode": "router",
-                "intent": intent,
-                "context": context,
-            }
+        return {
+            "response": result["final_response"],
+            "conversation": result["conversation"],
+            "specialist": result["specialist"],
+            "mode": "autogen",
+            "context": context,
+        }
 
     except Exception as e:
         import traceback
         error_detail = traceback.format_exc()
         return {
-            "response": f"❌ System error: {e}\n\nDetails:\n{error_detail}",
+            "response": f"System error: {e}\n\nDetails:\n{error_detail}",
             "mode": "error",
             "context": context,
         }
+
 
 
 # ============================================================
