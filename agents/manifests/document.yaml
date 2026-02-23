@@ -1,5 +1,6 @@
 name: document_agent
 description: Answer questions about uploaded documents using vector search.
+model: nemotron-3-nano:latest
 
 system_prompt: |
   You are a document analysis specialist.
@@ -19,6 +20,6 @@ priority: high
 enabled: true
 
 metadata:
-  version: "1.0"
+  version: "1.1"
   author: "system"
   tags: ["rag", "documents", "pdf", "vector"]

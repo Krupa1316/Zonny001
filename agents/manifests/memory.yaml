@@ -1,5 +1,6 @@
 name: memory_agent
 description: Recall past conversations and maintain context across interactions.
+model: nemotron-3-nano:latest
 
 system_prompt: |
   You are a memory specialist that tracks conversation history.
@@ -19,6 +20,6 @@ priority: medium
 enabled: true
 
 metadata:
-  version: "1.0"
+  version: "1.1"
   author: "system"
   tags: ["memory", "history", "context", "continuity"]

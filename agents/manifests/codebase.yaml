@@ -1,5 +1,6 @@
 name: codebase_agent
 description: Analyze code, search codebase, and provide programming assistance.
+model: deepseek-coder:33b
 
 system_prompt: |
   You are a senior software engineer specializing in code analysis.
@@ -21,6 +22,6 @@ priority: high
 enabled: true
 
 metadata:
-  version: "1.0"
+  version: "1.1"
   author: "system"
   tags: ["code", "analysis", "programming", "files"]
