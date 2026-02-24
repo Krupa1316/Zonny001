@@ -239,3 +239,116 @@ async def stream_company(
         "files":       all_files,
         "saved_paths": saved,
     }
+
+
+async def stream_repair(
+    session_id: str,
+    errors: List[str],
+    attempt: int = 1,
+) -> AsyncGenerator[Dict, None]:
+    """
+    Repair loop: reads existing generated files, sends errors to a repair agent,
+    gets fixed code, saves it, and streams progress.
+
+    Yields dicts: {type: "repair_start"|"message"|"done", ...}
+    """
+    session_dir = OUTPUTS_DIR / session_id
+    if not session_dir.exists():
+        yield {"type": "error", "content": f"Session directory not found: {session_id}"}
+        return
+
+    # Read all existing files
+    existing_files: Dict[str, str] = {}
+    for f in session_dir.iterdir():
+        if f.is_file() and f.suffix.lower() in ('.html', '.css', '.js', '.py', '.json', '.ts'):
+            try:
+                existing_files[f.name] = f.read_text(encoding="utf-8")
+            except Exception:
+                pass
+
+    if not existing_files:
+        yield {"type": "error", "content": "No source files found to repair."}
+        return
+
+    yield {"type": "repair_start", "attempt": attempt, "file_count": len(existing_files), "error_count": len(errors)}
+
+    # Build repair prompt with current files + errors
+    file_listing = "\n".join(
+        f"--- FILE: {name} ---\n{content}\n"
+        for name, content in existing_files.items()
+    )
+    error_listing = "\n".join(f"- {e}" for e in errors)
+
+    repair_prompt = f"""You are a code repair agent. The following application was generated but has errors when running in the browser.
+
+## Errors detected:
+{error_listing}
+
+## Current source files:
+{file_listing}
+
+## Instructions:
+1. Analyse the errors carefully
+2. Fix ALL the issues in the source code
+3. Output the COMPLETE fixed files using this exact format for each file:
+
+// FILE: filename.ext
+<complete file content here>
+
+You MUST output ALL files (even unchanged ones) so the application is complete.
+Do NOT add explanations before or after the files — only output the fixed code.
+"""
+
+    # Use frontend + backend agents for repair (they're the coding agents)
+    repair_agents_keys = ["frontend", "backend"]
+    agents = [_make_agent(k) for k in repair_agents_keys]
+
+    # Override system message for repair context
+    for agent in agents:
+        agent._system_messages = [
+            {"role": "system", "content": "You are a code repair specialist. Read the errors and fix the source files. Output complete fixed files using // FILE: markers."}
+        ]
+
+    termination = TextMentionTermination("REPAIR_COMPLETE")
+    team = RoundRobinGroupChat(
+        participants=agents,
+        termination_condition=termination,
+        max_turns=len(agents),  # Each agent gets one turn
+    )
+
+    all_files: Dict[str, str] = {}
+    conversation = []
+
+    async for event in team.run_stream(task=repair_prompt):
+        event_type = type(event).__name__
+
+        if event_type == "TextMessage":
+            name    = getattr(event, "source", "unknown")
+            content = getattr(event, "content", "")
+            if not isinstance(content, str):
+                content = str(content)
+
+            extracted = _extract_files(content)
+            all_files.update(extracted)
+            conversation.append({"agent": name, "content": content})
+
+            yield {
+                "type":            "message",
+                "agent":           name,
+                "content":         content,
+                "files_extracted": list(extracted.keys()),
+            }
+
+        elif event_type == "TaskResult":
+            break
+
+    # Save repaired files
+    saved = _save_files(session_id, all_files) if all_files else []
+
+    yield {
+        "type":         "done",
+        "files_fixed":  list(all_files.keys()),
+        "saved_paths":  saved,
+        "attempt":      attempt,
+    }
+

@@ -430,22 +430,115 @@ els.companyRunBtn.addEventListener('click', runCompany);
 els.companyPrompt.addEventListener('keydown', e => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); runCompany(); } });
 
 // ═══════════════════════════════
-// PREVIEW
+// PREVIEW + AUTO-REPAIR LOOP
 // ═══════════════════════════════
+const MAX_REPAIR_ATTEMPTS = 3;
+let repairAttempt = 0, repairing = false;
+
 function loadPreview(session) {
   if (!session) return;
+  repairAttempt = 0;
   const url = `${getBase()}/preview/${session}`;
   els.previewIframe.src = url;
   els.previewUrl.textContent = url;
   els.previewEmpty.classList.add('hidden');
+  updateRepairStatus('loading', 'Loading preview…');
   // Switch to preview tab
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
   document.querySelector('[data-tab="preview"]').classList.add('active');
   $('tab-preview').classList.add('active');
 }
+
+function updateRepairStatus(state, text) {
+  // state: 'loading' | 'ok' | 'error' | 'repairing' | 'failed'
+  let badge = $('repair-status');
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.id = 'repair-status';
+    badge.className = 'repair-badge';
+    els.previewUrl.parentElement.insertBefore(badge, els.previewNewtab);
+  }
+  badge.textContent = text;
+  badge.className = 'repair-badge repair-' + state;
+}
+
+// Listen for errors from the preview iframe
+window.addEventListener('message', (e) => {
+  if (!e.data?.type) return;
+  if (e.data.type === 'preview-errors') {
+    console.warn('[Preview] Errors detected:', e.data.errors);
+    updateRepairStatus('error', `${e.data.errors.length} error(s) detected`);
+    if (repairAttempt < MAX_REPAIR_ATTEMPTS && !repairing && companySession) {
+      triggerRepair(e.data.errors);
+    } else if (repairAttempt >= MAX_REPAIR_ATTEMPTS) {
+      updateRepairStatus('failed', `Repair failed after ${MAX_REPAIR_ATTEMPTS} attempts`);
+    }
+  } else if (e.data.type === 'preview-ok') {
+    updateRepairStatus('ok', '✓ Running');
+  }
+});
+
+async function triggerRepair(errors) {
+  repairing = true;
+  repairAttempt++;
+  updateRepairStatus('repairing', `Repairing (attempt ${repairAttempt}/${MAX_REPAIR_ATTEMPTS})…`);
+  addCompanyMsg('system', `🔧 Auto-repair attempt ${repairAttempt}: ${errors.length} error(s) detected. Agents are fixing…`);
+
+  const body = JSON.stringify({ session: companySession, errors, attempt: repairAttempt });
+  try {
+    const r = await fetch(`${getBase()}/company/repair`, { method: 'POST', headers: authHdrs(), body });
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    const reader = r.body.getReader(), dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n\n'); buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        try {
+          const ev = JSON.parse(line.slice(5).trim());
+          if (ev.type === 'repair_start') {
+            addCompanyMsg('system', `📋 Reading ${ev.file_count} files, fixing ${ev.error_count} errors…`);
+          } else if (ev.type === 'message') {
+            addCompanyMsg(ev.agent, ev.content);
+            if (ev.files_extracted?.length) {
+              ev.files_extracted.forEach(f => addGeneratedFile(f));
+            }
+          } else if (ev.type === 'done') {
+            const fixed = ev.files_fixed || [];
+            addCompanyMsg('system', `✅ Repair attempt ${ev.attempt} complete. Fixed: ${fixed.join(', ') || 'none'}`);
+            // Reload preview to test the fixes
+            if (fixed.length > 0) {
+              updateRepairStatus('loading', 'Reloading preview…');
+              setTimeout(() => {
+                els.previewIframe.src = `${getBase()}/preview/${companySession}`;
+              }, 500);
+            } else {
+              updateRepairStatus('failed', 'No files were fixed');
+            }
+          } else if (ev.type === 'error') {
+            addCompanyMsg('system', `❌ Repair error: ${ev.content}`);
+            updateRepairStatus('failed', 'Repair error');
+          }
+        } catch (e) { }
+      }
+    }
+  } catch (e) {
+    addCompanyMsg('system', `❌ Repair failed: ${e.message}`);
+    updateRepairStatus('failed', 'Repair connection failed');
+  } finally {
+    repairing = false;
+  }
+}
+
 els.previewRefresh.addEventListener('click', () => {
-  if (companySession) els.previewIframe.src = `${getBase()}/preview/${companySession}`;
+  if (companySession) {
+    repairAttempt = 0;
+    updateRepairStatus('loading', 'Refreshing…');
+    els.previewIframe.src = `${getBase()}/preview/${companySession}`;
+  }
 });
 els.previewNewtab.addEventListener('click', () => {
   if (companySession) window.open(`${getBase()}/preview/${companySession}`, '_blank');

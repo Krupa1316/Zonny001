@@ -45,7 +45,7 @@ _manifest_loader = ManifestLoader("agents/manifests")
 # v0.3: AutoGen runtime
 from zonny.autogen_runtime import run_team, stream_team, get_agent_status
 # v0.4: Company runtime
-from zonny.company_runtime import stream_company, run_company
+from zonny.company_runtime import stream_company, run_company, stream_repair
 
 OUTPUTS_DIR = Path(__file__).parent / "outputs"
 OUTPUTS_DIR.mkdir(exist_ok=True)
@@ -301,6 +301,41 @@ async def preview_app(session: str):
     import re as _re
     content = _re.sub(r'(href|src)="(?!https?://|//)([^"]+)"',
                       rf'\1="/preview/{session}/\2"', content)
+    # Inject error-catching script for auto-repair
+    error_script = """
+<script>
+(function(){
+  var errors = [];
+  window.onerror = function(msg, src, line, col, err) {
+    errors.push(msg + ' at ' + (src||'unknown') + ':' + line + ':' + col);
+    clearTimeout(window.__errTimer);
+    window.__errTimer = setTimeout(function(){ sendErrors(); }, 1500);
+  };
+  window.addEventListener('unhandledrejection', function(e) {
+    errors.push('Unhandled Promise: ' + (e.reason || e));
+    clearTimeout(window.__errTimer);
+    window.__errTimer = setTimeout(function(){ sendErrors(); }, 1500);
+  });
+  function sendErrors() {
+    if (errors.length > 0 && window.parent !== window) {
+      window.parent.postMessage({type:'preview-errors', errors: errors.slice()}, '*');
+      errors = [];
+    }
+  }
+  // Also report successful load (no errors after 3s)
+  setTimeout(function(){
+    if (errors.length === 0 && window.parent !== window) {
+      window.parent.postMessage({type:'preview-ok'}, '*');
+    }
+  }, 3000);
+})();
+</script>
+"""
+    # Inject before </body> or at the end
+    if '</body>' in content:
+        content = content.replace('</body>', error_script + '</body>')
+    else:
+        content += error_script
     return HTMLResponse(content)
 
 
@@ -318,6 +353,39 @@ async def preview_static(session: str, filename: str):
     ct = ct_map.get(ext, "text/plain")
     from starlette.responses import Response
     return Response(content=fpath.read_bytes(), media_type=ct)
+
+
+# ============================================================
+# Repair — auto-fix generated app errors
+# ============================================================
+
+class RepairRequest(BaseModel):
+    session: str
+    errors: list[str]
+    attempt: int = 1
+
+
+@app.post("/company/repair")
+async def company_repair(
+    req: RepairRequest, _: str = Depends(verify_api_key)
+):
+    """
+    SSE stream of the repair agent fixing errors in a generated app.
+    Events: {type: repair_start|message|done, ...}
+    """
+    async def gen():
+        try:
+            async for event in stream_repair(req.session, req.errors, req.attempt):
+                yield f"data: {json.dumps(event)}\n\n"
+                await asyncio.sleep(0)
+        except Exception as e:
+            import traceback
+            yield f"data: {json.dumps({'type':'error','content':str(e),'detail':traceback.format_exc()})}\n\n"
+        finally:
+            yield f"data: {json.dumps({'type':'stream_end'})}\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control":"no-cache","X-Accel-Buffering":"no"})
 
 
 # ============================================================
