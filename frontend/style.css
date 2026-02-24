@@ -164,14 +164,33 @@ body {
 }
 
 .tab-page {
-  display: none;
+  display: none !important;
   height: 100%;
   overflow: hidden;
 }
 
-.tab-page.active {
-  display: grid;
+#tab-chat.active {
+  display: grid !important;
+  grid-template-columns: 210px 1fr 240px;
 }
+
+#tab-convo.active {
+  display: grid !important;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 1fr;
+}
+
+#tab-ide.active {
+  display: grid !important;
+  grid-template-rows: 1fr 220px;
+  grid-template-columns: 220px 1fr;
+}
+
+#tab-company.active {
+  display: grid !important;
+  grid-template-columns: 1fr 320px;
+}
+
 
 /* ═══ SHARED PANELS ═══ */
 .side-panel {
