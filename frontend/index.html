@@ -4,11 +4,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Zonny — AI Agent Platform</title>
+  <title>Zonny — AI Dev Platform</title>
   <link rel="stylesheet" href="/frontend/style.css" />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-    rel="stylesheet" />
+  <!-- Monaco Editor -->
+  <link rel="stylesheet" data-name="vs/editor/editor.main"
+    href="https://unpkg.com/monaco-editor@0.45.0/min/vs/editor/editor.main.css" />
+  <!-- xterm.js -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
 </head>
 
 <body>
@@ -17,104 +19,203 @@
     <div class="header-brand">
       <span class="brand-logo">Z</span>
       <span class="brand-name">Zonny</span>
-      <span class="brand-version">v0.3</span>
+      <span class="brand-version">v0.4</span>
     </div>
     <nav class="header-tabs">
       <button class="tab-btn active" data-tab="chat">💬 Chat</button>
-      <button class="tab-btn" data-tab="convo">🤖 Agent Conversation</button>
+      <button class="tab-btn" data-tab="convo">🤖 Agent Log</button>
+      <button class="tab-btn" data-tab="ide">💻 IDE</button>
+      <button class="tab-btn" data-tab="company">🏢 Company</button>
     </nav>
     <div class="header-actions">
-      <span class="status-dot" id="status-dot" title="Server status"></span>
+      <span class="status-dot" id="status-dot"></span>
       <button class="icon-btn" id="settings-btn" title="Settings">⚙</button>
     </div>
   </header>
 
-  <!-- ═══ MAIN LAYOUT ═══ -->
   <main id="app-main">
-    <!-- LEFT: Agent Roster -->
-    <aside id="left-panel">
-      <div class="panel-label">AGENTS</div>
-      <div id="agent-roster"></div>
-    </aside>
 
-    <!-- CENTER: Tab content -->
-    <section id="center-panel">
+    <!-- ════════════════════════════════════════
+         TAB: CHAT
+    ════════════════════════════════════════ -->
+    <div id="tab-chat" class="tab-page active" style="display:grid;grid-template-columns:210px 1fr 240px;">
 
-      <!-- TAB: Chat -->
-      <div id="tab-chat" class="tab-content active">
-        <!-- Pipeline visualization -->
-        <div id="pipeline-bar"></div>
+      <!-- Left: Agent Roster -->
+      <aside class="side-panel">
+        <div class="panel-label">AGENTS</div>
+        <div id="agent-roster"></div>
+      </aside>
 
-        <!-- Chat thread -->
+      <!-- Center: Chat -->
+      <section class="center-col">
         <div id="chat-thread">
           <div class="welcome-msg">
             <div class="welcome-icon">⚡</div>
             <h2>Ask Zonny anything</h2>
-            <p>Multiple specialized agents work together to answer.</p>
+            <p>Specialized agents collaborate to answer.</p>
           </div>
         </div>
-
-        <!-- Activity feed -->
         <div id="activity-panel">
           <div class="activity-header">
             <span>AGENT ACTIVITY</span>
-            <button class="icon-btn-sm" id="clear-activity" title="Clear activity">✕</button>
+            <button class="icon-btn-sm" id="clear-activity">✕</button>
           </div>
           <div id="activity-log">
-            <p class="activity-hint">Agent activity will appear here during processing…</p>
+            <p class="activity-hint">Activity will appear here…</p>
           </div>
         </div>
-
-        <!-- Input bar -->
         <div id="input-bar">
-          <button id="upload-btn" class="icon-btn" title="Upload document">📎</button>
-          <input type="file" id="file-input" style="display:none" accept=".pdf,.txt,.md,.py,.js" />
-          <textarea id="chat-input" placeholder="Ask anything… (Shift+Enter for newline)" rows="1"></textarea>
-          <button id="send-btn" title="Send">➤</button>
+          <button class="icon-btn" id="upload-btn">📎</button>
+          <input type="file" id="file-input" style="display:none" />
+          <textarea id="chat-input" placeholder="Ask anything… (Enter to send)" rows="1"></textarea>
+          <button id="send-btn">➤</button>
         </div>
-      </div>
+      </section>
 
-      <!-- TAB: Agent Conversation -->
-      <div id="tab-convo" class="tab-content">
-        <div id="convo-header">
-          <div class="convo-meta" id="convo-meta">No conversation yet. Send a message in Chat.</div>
-          <button class="icon-btn-sm" id="clear-convo">✕</button>
-        </div>
-        <div id="convo-thread">
-          <div class="convo-empty">
-            <div class="welcome-icon">🤝</div>
-            <h3>Agent Conversation</h3>
-            <p>Full internal agent discussion will appear here after you chat.</p>
-          </div>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- RIGHT: Agent detail -->
-    <aside id="right-panel">
-      <div id="agent-detail-empty">Select an agent to view details</div>
-      <div id="agent-detail" style="display:none">
-        <div class="detail-avatar" id="detail-avatar"></div>
-        <div class="detail-name" id="detail-name"></div>
-        <div class="detail-model" id="detail-model"></div>
-        <div class="detail-section">
-          <div class="detail-label">CURRENT TASK</div>
-          <div class="detail-task" id="detail-task">—</div>
-        </div>
-        <div class="detail-section">
-          <div class="detail-label">STATUS</div>
-          <div class="detail-status" id="detail-status">idle</div>
-        </div>
-        <div class="detail-section">
-          <div class="detail-label">ACTIVITY LOG</div>
+      <!-- Right: Agent Detail -->
+      <aside class="side-panel side-panel-right">
+        <div id="agent-detail-empty">Select an agent</div>
+        <div id="agent-detail" style="display:none">
+          <div class="detail-avatar" id="detail-avatar"></div>
+          <div class="detail-name" id="detail-name"></div>
+          <div class="detail-model" id="detail-model"></div>
+          <div class="detail-label" style="margin-top:12px">ACTIVITY</div>
           <div class="detail-log" id="detail-log"></div>
         </div>
+      </aside>
+    </div>
+
+    <!-- ════════════════════════════════════════
+         TAB: AGENT CONVERSATION
+    ════════════════════════════════════════ -->
+    <div id="tab-convo" class="tab-page">
+      <div class="tab-topbar">
+        <span class="convo-meta" id="convo-meta">No conversation yet.</span>
+        <button class="icon-btn-sm" id="clear-convo">✕</button>
       </div>
-    </aside>
+      <div id="convo-thread">
+        <div class="convo-empty">
+          <div class="welcome-icon">🤝</div>
+          <h3>Agent Conversation</h3>
+          <p>Internal agent discussion will appear here after you chat.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════
+         TAB: IDE
+    ════════════════════════════════════════ -->
+    <div id="tab-ide" class="tab-page"
+      style="display:grid;grid-template-rows:1fr 220px;grid-template-columns:220px 1fr;">
+
+      <!-- File Explorer (spans both rows) -->
+      <aside class="ide-explorer" style="grid-row:1/3;">
+        <div class="panel-label">
+          FILES
+          <span style="flex:1"></span>
+          <button class="icon-btn-sm" id="ide-browse-btn" title="Open folder">📂</button>
+        </div>
+        <div id="file-tree"></div>
+        <div class="explorer-path" id="explorer-path">outputs/</div>
+      </aside>
+
+      <!-- Monaco Editor -->
+      <div id="monaco-container">
+        <div class="editor-tabs-bar" id="editor-tabs-bar">
+          <span class="no-file-hint">Open a file to edit</span>
+        </div>
+        <div id="monaco-editor"></div>
+      </div>
+
+      <!-- Terminal -->
+      <div id="terminal-panel">
+        <div class="terminal-topbar">
+          <span>TERMINAL</span>
+          <button class="icon-btn-sm" id="terminal-reconnect" title="Reconnect">↺</button>
+        </div>
+        <div id="xterm-container"></div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════
+         TAB: COMPANY
+    ════════════════════════════════════════ -->
+    <div id="tab-company" class="tab-page" style="display:grid;grid-template-columns:1fr 320px;">
+
+      <!-- Main company area -->
+      <section class="center-col">
+        <!-- Pipeline viz -->
+        <div id="company-pipeline">
+          <div class="pipe-stage" data-agent="ceo_agent">
+            <div class="pipe-icon">👔</div>
+            <div class="pipe-label">CEO</div>
+            <div class="pipe-status">idle</div>
+          </div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-stage" data-agent="architect_agent">
+            <div class="pipe-icon">🏗</div>
+            <div class="pipe-label">Arch</div>
+            <div class="pipe-status">idle</div>
+          </div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-stage" data-agent="frontend_agent">
+            <div class="pipe-icon">🎨</div>
+            <div class="pipe-label">Frontend</div>
+            <div class="pipe-status">idle</div>
+          </div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-stage" data-agent="backend_agent">
+            <div class="pipe-icon">⚙</div>
+            <div class="pipe-label">Backend</div>
+            <div class="pipe-status">idle</div>
+          </div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-stage" data-agent="qa_agent">
+            <div class="pipe-icon">🧪</div>
+            <div class="pipe-label">QA</div>
+            <div class="pipe-status">idle</div>
+          </div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-stage" data-agent="reviewer_agent">
+            <div class="pipe-icon">✅</div>
+            <div class="pipe-label">Review</div>
+            <div class="pipe-status">idle</div>
+          </div>
+        </div>
+
+        <!-- Prompt input -->
+        <div id="company-input-bar">
+          <textarea id="company-prompt" placeholder="Describe what to build… e.g. 'Build a Pomodoro timer app'"
+            rows="2"></textarea>
+          <button id="company-run-btn">Build ➤</button>
+        </div>
+
+        <!-- Live transcript -->
+        <div id="company-transcript">
+          <div class="company-empty">
+            <div class="welcome-icon">🏢</div>
+            <h3>Software Company</h3>
+            <p>Describe a project above. Six agents will plan, design, code, test, and review it.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right: Generated Files -->
+      <aside class="side-panel side-panel-right">
+        <div class="panel-label">GENERATED FILES</div>
+        <div id="company-files">
+          <p class="activity-hint">Files will appear here after company runs.</p>
+        </div>
+        <div id="company-ship-report" style="display:none">
+          <div class="detail-label">SHIP REPORT</div>
+          <div id="ship-report-content"></div>
+        </div>
+      </aside>
+    </div>
+
   </main>
 
-  <!-- ═══ SETTINGS MODAL ═══ -->
+  <!-- Settings Modal -->
   <div id="settings-modal" class="modal hidden">
     <div class="modal-box">
       <div class="modal-title">Settings</div>
@@ -128,10 +229,21 @@
         <input type="text" id="server-url-input" placeholder="http://localhost:8000" />
         <button id="save-url-btn">Save</button>
       </div>
+      <div class="modal-field">
+        <label>IDE Workspace Path</label>
+        <input type="text" id="workspace-path-input" placeholder="C:/Users/..." />
+        <button id="save-workspace-btn">Save</button>
+      </div>
       <button class="modal-close" id="close-modal">✕</button>
     </div>
   </div>
 
+  <!-- Monaco loader -->
+  <script>var require = { paths: { vs: 'https://unpkg.com/monaco-editor@0.45.0/min/vs' } };</script>
+  <script src="https://unpkg.com/monaco-editor@0.45.0/min/vs/loader.js"></script>
+  <!-- xterm -->
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
   <script src="/frontend/app.js"></script>
 </body>
 

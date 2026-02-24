@@ -22,7 +22,7 @@ import uuid
 import os
 from pathlib import Path
 
-from fastapi import UploadFile, File, FastAPI, HTTPException, Depends, Request
+from fastapi import UploadFile, File, FastAPI, HTTPException, Depends, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -44,6 +44,11 @@ _manifest_loader = ManifestLoader("agents/manifests")
 
 # v0.3: AutoGen runtime
 from zonny.autogen_runtime import run_team, stream_team, get_agent_status
+# v0.4: Company runtime
+from zonny.company_runtime import stream_company, run_company
+
+OUTPUTS_DIR = Path(__file__).parent / "outputs"
+OUTPUTS_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(title="Zonny", version="0.3.0")
 
@@ -172,73 +177,213 @@ async def agent_status_list(_: str = Depends(verify_api_key)):
 @app.post("/mcp")
 async def mcp_gateway(req: MCPRequest, _: str = Depends(verify_api_key)):
     """
-    MCP Gateway — Zonny Protocol v1 / v0.3
+    MCP Gateway — Zonny v0.3 (AutoGen-powered)
 
-    v0.3 change: complex tasks now route through AutoGen multi-model team.
-
-    MODE 1 - Router (simple queries, fast):
-      CLI → Semantic Router → Intent → Dispatcher → Result
-
-    MODE 2 - AutoGen Team (complex tasks):
-      CLI → AutoGen SelectorGroupChat → Result
+    All prompts route through the 2-agent AutoGen team:
+      Specialist → analyses task
+      Assistant  → synthesises final answer + TERMINATE
     """
-    from zonny.semantic_router import route
-    from zonny.dispatcher import dispatch
-    from zonny.planner import is_complex_task
-    from tools.workspace import scan_workspace
-    from commands.system import handle_system_command
-
-    # Validate payload
     if not req.input and not req.command:
         raise HTTPException(status_code=400, detail="Must provide input or command")
 
-    # Build context
-    workspace_context = scan_workspace()
-    context = {
-        "session": req.session,
-        "cwd": os.getcwd(),
-        "files": workspace_context.get("files", []),
-        "directories": workspace_context.get("directories", []),
-        "workspace": workspace_context.get("workspace", "unknown"),
-    }
+    user_input = (req.input or req.command or "").strip()
+    context = {"session": req.session, "cwd": os.getcwd()}
 
-    user_input = req.input or req.command or ""
-
-    # Handle legacy system commands (backwards compatibility)
+    # Handle slash commands
     if user_input.startswith("/"):
         try:
             from commands.system import handle_system_command
-            command_response = handle_system_command(user_input, req.session, context)
-            if command_response:
-                return {
-                    "response": command_response.get("response", ""),
-                    "action": command_response.get("action"),
-                    "context": context,
-                    "mode": "command",
-                }
-        except ImportError:
-            pass
+            resp = handle_system_command(user_input, req.session, context)
+            if resp:
+                return {"response": resp.get("response", ""), "mode": "command"}
+        except Exception:
+            pass  # Fall through to AutoGen if command handler missing
 
     try:
-        # Always route through AutoGen multi-agent team
         result = await run_team(task=user_input, session_id=req.session)
-
         return {
             "response": result["final_response"],
             "conversation": result["conversation"],
             "specialist": result["specialist"],
             "mode": "autogen",
-            "context": context,
         }
-
     except Exception as e:
         import traceback
-        error_detail = traceback.format_exc()
+        tb = traceback.format_exc()
+        # Return as 200 so the UI displays the error clearly
         return {
-            "response": f"System error: {e}\n\nDetails:\n{error_detail}",
+            "response": f"Agent error: {e}",
+            "detail": tb,
             "mode": "error",
-            "context": context,
         }
+
+
+# ============================================================
+# Company — Software Company Agent Pipeline
+# ============================================================
+
+class CompanyRequest(BaseModel):
+    session: str
+    prompt: str
+
+
+@app.post("/company/stream")
+async def company_stream(
+    req: CompanyRequest, _: str = Depends(verify_api_key)
+):
+    """
+    SSE stream of the 6-agent software company pipeline.
+    Events: {type: message|done, agent, content, files_extracted}
+    """
+    sid = req.session or str(__import__('uuid').uuid4())[:8]
+
+    async def gen():
+        try:
+            async for event in stream_company(req.prompt, session_id=sid):
+                yield f"data: {json.dumps(event)}\n\n"
+                await asyncio.sleep(0)
+        except Exception as e:
+            import traceback
+            yield f"data: {json.dumps({'type':'error','content':str(e),'detail':traceback.format_exc()})}\n\n"
+        finally:
+            yield f"data: {json.dumps({'type':'done'})}\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control":"no-cache","X-Accel-Buffering":"no"})
+
+
+@app.get("/company/files/{session}")
+async def list_company_files(session: str, _: str = Depends(verify_api_key)):
+    """List files generated by a company session."""
+    session_dir = OUTPUTS_DIR / session
+    if not session_dir.exists():
+        return {"files": []}
+    files = []
+    for f in session_dir.iterdir():
+        if f.is_file():
+            files.append({"name": f.name, "size": f.stat().st_size,
+                           "path": str(f).replace("\\", "/")})
+    return {"files": files, "session": session}
+
+
+@app.get("/company/file/{session}/{filename}")
+async def get_company_file(
+    session: str, filename: str, _: str = Depends(verify_api_key)
+):
+    """Return content of a generated file."""
+    fpath = OUTPUTS_DIR / session / filename
+    if not fpath.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return {"filename": filename, "content": fpath.read_text(encoding="utf-8")}
+
+
+# ============================================================
+# File API — read/write/tree any path (for IDE)
+# ============================================================
+
+class FileReadRequest(BaseModel):
+    path: str
+
+class FileWriteRequest(BaseModel):
+    path: str
+    content: str
+
+
+@app.post("/files/read")
+async def file_read(req: FileReadRequest, _: str = Depends(verify_api_key)):
+    """Read any file from disk."""
+    p = Path(req.path)
+    if not p.exists() or not p.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    try:
+        return {"path": str(p), "content": p.read_text(encoding="utf-8")}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/files/write")
+async def file_write(req: FileWriteRequest, _: str = Depends(verify_api_key)):
+    """Write/save a file to disk."""
+    p = Path(req.path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(req.content, encoding="utf-8")
+    return {"saved": str(p), "size": p.stat().st_size}
+
+
+@app.get("/files/tree")
+async def file_tree(
+    path: str = ".", _: str = Depends(verify_api_key)
+):
+    """Return directory tree (1 level per call for performance)."""
+    root = Path(path).resolve()
+    if not root.exists() or not root.is_dir():
+        raise HTTPException(status_code=404, detail="Directory not found")
+    entries = []
+    try:
+        for item in sorted(root.iterdir(), key=lambda x: (x.is_file(), x.name.lower())):
+            entries.append({
+                "name":   item.name,
+                "path":   str(item).replace("\\", "/"),
+                "type":   "file" if item.is_file() else "directory",
+                "size":   item.stat().st_size if item.is_file() else None,
+                "ext":    item.suffix.lstrip(".") if item.is_file() else None,
+            })
+    except PermissionError:
+        pass
+    return {"path": str(root).replace("\\","/"), "entries": entries}
+
+
+# ============================================================
+# Terminal — WebSocket PTY
+# ============================================================
+
+@app.websocket("/terminal")
+async def terminal_ws(ws: WebSocket, api_key: str = ""):
+    """
+    WebSocket terminal: spawns PowerShell, streams I/O bidirectionally.
+    Connect with ?api_key=... in the URL query param.
+    """
+    # Validate key via query param (WebSocket can't send headers easily)
+    valid_keys = load_keys()
+    if valid_keys and api_key not in valid_keys:
+        await ws.close(code=4001)
+        return
+
+    await ws.accept()
+    proc = await asyncio.create_subprocess_exec(
+        "powershell.exe", "-NoLogo", "-NoProfile",
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+    )
+
+    async def read_output():
+        """Pump subprocess stdout → websocket."""
+        try:
+            while True:
+                chunk = await proc.stdout.read(1024)
+                if not chunk:
+                    break
+                await ws.send_text(chunk.decode("utf-8", errors="replace"))
+        except Exception:
+            pass
+
+    reader_task = asyncio.create_task(read_output())
+
+    try:
+        while True:
+            data = await ws.receive_text()
+            if proc.stdin and not proc.stdin.is_closing():
+                proc.stdin.write(data.encode("utf-8"))
+                await proc.stdin.drain()
+    except (WebSocketDisconnect, Exception):
+        pass
+    finally:
+        reader_task.cancel()
+        try:
+            proc.terminate()
+        except Exception:
+            pass
 
 
 
