@@ -32,6 +32,9 @@ const els = {
   companyPrompt: $('company-prompt'), companyRunBtn: $('company-run-btn'),
   companyTranscript: $('company-transcript'), companyFiles: $('company-files'),
   companyShipReport: $('company-ship-report'), shipReportContent: $('ship-report-content'),
+  previewIframe: $('preview-iframe'), previewUrl: $('preview-url'),
+  previewRefresh: $('preview-refresh'), previewNewtab: $('preview-newtab'),
+  previewEmpty: $('preview-empty'),
 };
 
 // ═══ State ═══
@@ -414,6 +417,8 @@ async function runCompany() {
             }
             // Refresh IDE file tree to show new files
             loadFileTree(`outputs/${companySession}`);
+            // Auto-open preview
+            loadPreview(companySession);
           }
         } catch (e) { }
       }
@@ -423,6 +428,28 @@ async function runCompany() {
 }
 els.companyRunBtn.addEventListener('click', runCompany);
 els.companyPrompt.addEventListener('keydown', e => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); runCompany(); } });
+
+// ═══════════════════════════════
+// PREVIEW
+// ═══════════════════════════════
+function loadPreview(session) {
+  if (!session) return;
+  const url = `${getBase()}/preview/${session}`;
+  els.previewIframe.src = url;
+  els.previewUrl.textContent = url;
+  els.previewEmpty.classList.add('hidden');
+  // Switch to preview tab
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+  document.querySelector('[data-tab="preview"]').classList.add('active');
+  $('tab-preview').classList.add('active');
+}
+els.previewRefresh.addEventListener('click', () => {
+  if (companySession) els.previewIframe.src = `${getBase()}/preview/${companySession}`;
+});
+els.previewNewtab.addEventListener('click', () => {
+  if (companySession) window.open(`${getBase()}/preview/${companySession}`, '_blank');
+});
 
 // ═══ Settings ═══
 els.settingsBtn.addEventListener('click', () => {

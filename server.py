@@ -278,6 +278,49 @@ async def get_company_file(
 
 
 # ============================================================
+# Preview — serve generated apps in an iframe
+# ============================================================
+
+@app.get("/preview/{session}")
+async def preview_app(session: str):
+    """Serve the generated app's index.html (or first .html file) for iframe preview."""
+    session_dir = OUTPUTS_DIR / session
+    if not session_dir.exists():
+        return HTMLResponse("<h2 style='font-family:sans-serif;color:#888;padding:40px'>No generated files yet. Run the Company pipeline first.</h2>")
+    # Look for index.html first, then any .html
+    index = session_dir / "index.html"
+    if not index.exists():
+        html_files = list(session_dir.glob("*.html"))
+        if html_files:
+            index = html_files[0]
+        else:
+            return HTMLResponse("<h2 style='font-family:sans-serif;color:#888;padding:40px'>No HTML files generated. Only non-HTML files were created.</h2>")
+    content = index.read_text(encoding="utf-8")
+    # Rewrite relative CSS/JS paths to route through /preview/{session}/
+    # e.g. href="style.css" → href="/preview/{session}/style.css"
+    import re as _re
+    content = _re.sub(r'(href|src)="(?!https?://|//)([^"]+)"',
+                      rf'\1="/preview/{session}/\2"', content)
+    return HTMLResponse(content)
+
+
+@app.get("/preview/{session}/{filename:path}")
+async def preview_static(session: str, filename: str):
+    """Serve static assets (CSS, JS, images) for the previewed app."""
+    fpath = OUTPUTS_DIR / session / filename
+    if not fpath.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    # Determine content type
+    ext = fpath.suffix.lower()
+    ct_map = {".html":"text/html",".css":"text/css",".js":"application/javascript",
+              ".json":"application/json",".png":"image/png",".jpg":"image/jpeg",
+              ".svg":"image/svg+xml",".ico":"image/x-icon",".gif":"image/gif"}
+    ct = ct_map.get(ext, "text/plain")
+    from starlette.responses import Response
+    return Response(content=fpath.read_bytes(), media_type=ct)
+
+
+# ============================================================
 # File API — read/write/tree any path (for IDE)
 # ============================================================
 
