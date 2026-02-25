@@ -222,7 +222,7 @@ function renderTree(entries) {
   entries.forEach(e => {
     const item = document.createElement('div');
     item.className = 'tree-item' + (e.type === 'directory' ? ' tree-dir' : '');
-    const icon = e.type === 'directory' ? '[DIR]' : fileIcon(e.ext || '');
+    const icon = e.type === 'directory' ? '\uD83D\uDCC1' : fileIcon(e.ext || '');
     item.innerHTML = `<span class="tree-icon">${icon}</span><span class="tree-name">${escHtml(e.name)}</span>`;
     item.addEventListener('click', () => {
       if (e.type === 'directory') loadFileTree(e.path);
@@ -233,8 +233,8 @@ function renderTree(entries) {
   });
 }
 function fileIcon(ext) {
-  const m = { 'py': '', 'js': '', 'ts': '', 'html': '[WORLD]', 'css': '[DESIGN]', 'json': '[LIST]', 'md': '[NOTE]', 'txt': '[DOC]', 'sh': '[GEAR]', 'yaml': '[GEAR]', 'yml': '[GEAR]' };
-  return m[ext] || '[DOC]';
+  const m = { 'py': 'PY', 'js': 'JS', 'ts': 'TS', 'html': 'HT', 'css': 'CS', 'json': '{}', 'md': 'MD', 'txt': 'TX', 'sh': 'SH', 'yaml': 'YM', 'yml': 'YM' };
+  return m[ext] || '--';
 }
 function extFromName(name) { return name.split('.').pop().toLowerCase(); }
 
