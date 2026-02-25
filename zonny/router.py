@@ -56,7 +56,7 @@ class ZonnyRouter:
         if input_text:
             return self._handle_input(input_text, context)
         
-        return "❌ No input or command provided"
+        return "[FAIL] No input or command provided"
     
     def _handle_command(self, command: str, context: Dict[str, Any]) -> str:
         """
@@ -81,7 +81,7 @@ class ZonnyRouter:
             return self._cmd_status(context)
         
         else:
-            return f"❌ Unknown command: {command}\n\n💡 Try /help for available commands"
+            return f"[FAIL] Unknown command: {command}\n\n[IDEA] Try /help for available commands"
     
     def _handle_input(self, input_text: str, context: Dict[str, Any]) -> str:
         """
@@ -103,18 +103,18 @@ class ZonnyRouter:
         session = context.get("session", "unknown")[:8]
         
         # For Slice A: Echo + basic info
-        response = f"""📝 Received your input (Slice A - Echo Mode)
+        response = f"""[NOTE] Received your input (Slice A - Echo Mode)
 
 Your message: {input_text}
 Session: {session}...
 
-🔜 In future slices:
+ In future slices:
    • Planner will analyze this
    • Agents will be selected
    • Tools will execute
    • Memory will be stored
 
-For now, Slice A infrastructure is working! ✅"""
+For now, Slice A infrastructure is working! [OK]"""
         
         return response
     
@@ -130,14 +130,14 @@ For now, Slice A infrastructure is working! ✅"""
         if not agents:
             return "No agents registered"
         
-        output = "📋 Available Agents\n"
+        output = "[LIST] Available Agents\n"
         output += "="*70 + "\n\n"
         
         for agent in agents:
-            status = "✅ ENABLED " if agent['enabled'] else "❌ DISABLED"
+            status = "[OK] ENABLED " if agent['enabled'] else "[FAIL] DISABLED"
             output += f"{status} | {agent['name']}\n"
-            output += f"           Description: {agent['description']}\n"
-            output += f"           Priority: {agent['priority']} | Tools: {len(agent['tools'])}\n"
+            output += f" Description: {agent['description']}\n"
+            output += f" Priority: {agent['priority']} | Tools: {len(agent['tools'])}\n"
             output += "\n"
         
         output += f"Total: {len(agents)} agents"
@@ -151,13 +151,13 @@ For now, Slice A infrastructure is working! ✅"""
         Returns:
             Help text
         """
-        return """📖 Zonny Help
+        return """ Zonny Help
 
 Commands:
-  /agents     - List all available agents and their status
-  /help       - Show this help message
-  /status     - Show current session status
-  /exit       - Exit Zonny
+  /agents - List all available agents and their status
+  /help - Show this help message
+  /status - Show current session status
+  /exit - Exit Zonny
 
 Chat:
   Just type your message and press Enter to chat with agents.
@@ -170,14 +170,14 @@ Architecture:
   • Tool-based execution
 
 Current Phase: Slice A (Interface Layer)
-  ✅ CLI interface
-  ✅ MCP Gateway
-  ✅ Request routing
+  [OK] CLI interface
+  [OK] MCP Gateway
+  [OK] Request routing
 
 Next Phases:
-  🔜 Agent execution
-  🔜 Memory integration
-  🔜 Tool calling"""
+   Agent execution
+   Memory integration
+   Tool calling"""
     
     def _cmd_status(self, context: Dict[str, Any]) -> str:
         """
@@ -195,7 +195,7 @@ Next Phases:
         agents = self.registry.list_agents()
         enabled_count = sum(1 for a in agents if a['enabled'])
         
-        output = "📊 Zonny Status\n"
+        output = "[STATS] Zonny Status\n"
         output += "="*70 + "\n\n"
         output += f"Session ID: {session}\n"
         output += f"Working Dir: {cwd}\n"

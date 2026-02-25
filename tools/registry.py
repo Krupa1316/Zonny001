@@ -40,7 +40,7 @@ def register(name: str, func):
     
     TOOLS[name] = func
     # Silent registration to avoid encoding issues on Windows
-    # print(f"🔧 Registered tool: {name}")
+    # print(f"[FIX] Registered tool: {name}")
 
 
 def get(name: str):

@@ -139,7 +139,7 @@ def plan(user_input: str, context: dict = None) -> dict:
                 "prompt": user_input,
                 "system": system_prompt,
                 "stream": False,
-                "temperature": 0.3  # Slightly higher for creative reasoning
+                "temperature": 0.3 # Slightly higher for creative reasoning
             },
             timeout=TIMEOUT
         )
@@ -374,8 +374,8 @@ class ReactPlanner:
                     "prompt": user_prompt,
                     "system": system_prompt,
                     "stream": False,
-                    "temperature": 0.1,  # Very low temperature for structured output
-                    "format": "json"     # Request JSON format from Ollama
+                    "temperature": 0.1, # Very low temperature for structured output
+                    "format": "json" # Request JSON format from Ollama
                 },
                 timeout=self.timeout
             )
@@ -406,7 +406,7 @@ class ReactPlanner:
             if '{' not in llm_output:
                 # No JSON at all - LLM returned plain text
                 # Use the text as a thought and trigger fallback
-                print(f"⚠️  LLM returned non-JSON text: {llm_output[:100]}...")
+                print(f"[WARN]️ LLM returned non-JSON text: {llm_output[:100]}...")
                 return self._fallback_decision(world_state, f"LLM returned text instead of JSON: {llm_output[:50]}")
             
             # Extract content between first { and matching }
@@ -426,7 +426,7 @@ class ReactPlanner:
             
             if json_end == -1:
                 # No matching closing brace
-                print(f"⚠️  Incomplete JSON from LLM: {llm_output[:200]}")
+                print(f"[WARN]️ Incomplete JSON from LLM: {llm_output[:200]}")
                 return self._fallback_decision(world_state, "LLM returned incomplete JSON")
             
             llm_output = llm_output[json_start:json_end].strip()
@@ -436,8 +436,8 @@ class ReactPlanner:
                 decision_data = json.loads(llm_output)
             except json.JSONDecodeError as je:
                 # Still can't parse - show what we tried
-                print(f"⚠️  Failed to parse extracted JSON:")
-                print(f"   Extracted: {llm_output[:200]}")
+                print(f"[WARN]️ Failed to parse extracted JSON:")
+                print(f" Extracted: {llm_output[:200]}")
                 return self._fallback_decision(world_state, f"JSON parse failed: {str(je)}")
             
             decision = Decision.from_dict(decision_data)
@@ -473,12 +473,12 @@ CRITICAL RULES:
 
 === PATH RULES (READ CAREFULLY) ===
 The workspace root IS ".". File paths are RELATIVE to it.
-- CORRECT:   "package.json"       (file at root)
-- CORRECT:   "src/index.js"       (file in subdirectory)
-- WRONG:     "myproject/package.json"  (NEVER include the workspace folder name)
-- WRONG:     "./package.json"     (no leading ./)
-If filesystem.list shows "📄 package.json" → read it as path: "package.json"
-If filesystem.list shows "📁 src/" → list it as path: "src", read files as "src/index.js"
+- CORRECT: "package.json" (file at root)
+- CORRECT: "src/index.js" (file in subdirectory)
+- WRONG: "myproject/package.json" (NEVER include the workspace folder name)
+- WRONG: "./package.json" (no leading ./)
+If filesystem.list shows "[DOC] package.json" → read it as path: "package.json"
+If filesystem.list shows "[DIR] src/" → list it as path: "src", read files as "src/index.js"
 
 === AVAILABLE TOOLS ===
 {tools_json}
@@ -521,10 +521,10 @@ User asks simple question:
 
 === OUTPUT FORMAT ===
 
-⚠️  CRITICAL: You MUST return ONLY valid JSON. No explanation, no markdown, no text before or after.
-⚠️  WRONG: "Let me think... {{...}}"  
-⚠️  WRONG: "✦ Starting exploration..."  
-✅  RIGHT: {{"thought":"...", ...}}
+[WARN]️ CRITICAL: You MUST return ONLY valid JSON. No explanation, no markdown, no text before or after.
+[WARN]️ WRONG: "Let me think... {{...}}" 
+[WARN]️ WRONG: " Starting exploration..." 
+[OK] RIGHT: {{"thought":"...", ...}}
 
 Return EXACTLY this JSON structure:
 
@@ -589,7 +589,7 @@ Now think about the current state below and make your ONE decision:"""
         if len(world_state.action_history) >= 3:
             last_3_actions = world_state.action_history[-3:]
             actions_str = [f"{a.get('action')}:{a.get('args', {}).get('path', '')}" for a in last_3_actions]
-            if len(set(actions_str)) == 1:  # All 3 are identical
+            if len(set(actions_str)) == 1: # All 3 are identical
                 # We're stuck! Try something different
                 return Decision(
                     thought="Detected loop - providing summary of what we know",
@@ -698,7 +698,7 @@ Now think about the current state below and make your ONE decision:"""
                 for f in world_state.files:
                     name = f.get('name', '') if isinstance(f, dict) else str(f)
                     if any(pattern in name.lower() for pattern in ['manifest', 'main', 'index', 'app']) and name not in already_read:
-                        if not f.get('is_dir', False):  # Only files, not directories
+                        if not f.get('is_dir', False): # Only files, not directories
                             return Decision(
                                 thought=f"Reading {name} to find application entry point",
                                 action="filesystem.read",
@@ -801,7 +801,7 @@ Now think about the current state below and make your ONE decision:"""
 
         project_type = self._identify_project_type(file_contents)
         sections = []
-        sections.append("📁 Project Summary")
+        sections.append("[DIR] Project Summary")
         sections.append("=" * 60)
 
         # ── Per-file analysis using actual content ──
@@ -819,17 +819,17 @@ Now think about the current state below and make your ONE decision:"""
                     deps = list(pkg.get('dependencies', {}).keys())
                     dev_deps = list(pkg.get('devDependencies', {}).keys())
                     scripts = list(pkg.get('scripts', {}).keys())
-                    sections.append(f"\n📦 package.json — {name}")
+                    sections.append(f"\n[PKG] package.json — {name}")
                     if desc:
-                        sections.append(f"   Description: {desc}")
+                        sections.append(f" Description: {desc}")
                     if deps:
-                        sections.append(f"   Dependencies: {', '.join(deps[:12])}")
+                        sections.append(f" Dependencies: {', '.join(deps[:12])}")
                     if dev_deps:
-                        sections.append(f"   Dev deps: {', '.join(dev_deps[:6])}")
+                        sections.append(f" Dev deps: {', '.join(dev_deps[:6])}")
                     if scripts:
-                        sections.append(f"   Scripts: {', '.join(scripts)}")
+                        sections.append(f" Scripts: {', '.join(scripts)}")
                 except Exception:
-                    sections.append(f"\n📦 {file_path} (could not parse)")
+                    sections.append(f"\n[PKG] {file_path} (could not parse)")
 
             elif any(fname.endswith(ext) for ext in ['.js', '.ts', '.jsx', '.tsx', '.mjs']):
                 requires = []
@@ -850,42 +850,42 @@ Now think about the current state below and make your ONE decision:"""
                     elif s.startswith('class '):
                         cls = s.split('(')[0].split(' ')[-1]
                         classes.append(cls)
-                sections.append(f"\n📄 {file_path} ({len(non_empty)} lines)")
+                sections.append(f"\n[DOC] {file_path} ({len(non_empty)} lines)")
                 if requires:
-                    sections.append(f"   Uses: {', '.join(dict.fromkeys(requires[:12]))}")
+                    sections.append(f" Uses: {', '.join(dict.fromkeys(requires[:12]))}")
                 if funcs:
-                    sections.append(f"   Functions: {', '.join(funcs[:8])}")
+                    sections.append(f" Functions: {', '.join(funcs[:8])}")
                 if classes:
-                    sections.append(f"   Classes: {', '.join(classes[:5])}")
+                    sections.append(f" Classes: {', '.join(classes[:5])}")
                 # Pull first meaningful comment as purpose hint
                 for line in lines[:30]:
                     s = line.strip()
                     if s.startswith(('//', '*', '/*')) and len(s) > 12:
                         hint = s.lstrip('/*\\- ').strip()
                         if hint:
-                            sections.append(f"   └ {hint}")
+                            sections.append(f" └ {hint}")
                             break
 
             elif fname.endswith('.py'):
                 imports = [l.strip() for l in lines if l.strip().startswith(('import ', 'from '))]
                 defs = [l.strip().split('(')[0].replace('def ', '').replace('async def ', '')
                         for l in lines if l.strip().startswith(('def ', 'async def '))]
-                sections.append(f"\n📄 {file_path} ({len(non_empty)} lines)")
+                sections.append(f"\n[DOC] {file_path} ({len(non_empty)} lines)")
                 if imports:
-                    sections.append(f"   Imports: {', '.join(i.split()[-1] for i in imports[:8])}")
+                    sections.append(f" Imports: {', '.join(i.split()[-1] for i in imports[:8])}")
                 if defs:
-                    sections.append(f"   Functions: {', '.join(defs[:8])}")
+                    sections.append(f" Functions: {', '.join(defs[:8])}")
 
             elif fname.endswith('.md') or 'readme' in fname:
                 preview = content[:300].strip()
-                sections.append(f"\n📖 {file_path}")
-                sections.append(f"   {preview}")
+                sections.append(f"\n {file_path}")
+                sections.append(f" {preview}")
             else:
-                sections.append(f"\n📄 {file_path} ({len(non_empty)} lines)")
+                sections.append(f"\n[DOC] {file_path} ({len(non_empty)} lines)")
 
         # ── Purpose paragraph ──
         sections.append("\n" + "=" * 60)
-        sections.append("🔍 Purpose & Architecture")
+        sections.append("[SEARCH] Purpose & Architecture")
         sections.append(self._generate_overview(file_contents, project_type))
 
         return "\n".join(sections)

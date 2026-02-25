@@ -84,7 +84,7 @@ Results: "Listed files... README.md not found"
 → {{"done": false, "reason": "README.md doesn't exist", "approach_quality": "acceptable", "efficiency_note": "Should check for alternatives like analysis.txt, setup.py", "confidence": 0.6, "next_action": "read analysis.txt or setup.py instead"}}
 
 Goal: "list files"
-Results: "📁 Files listed: 69 files"
+Results: "[DIR] Files listed: 69 files"
 → {{"done": true, "reason": "Simple task completed efficiently", "approach_quality": "excellent", "confidence": 1.0, "next_action": null}}
 
 Be honest about approach quality. Reward smart context-aware planning.
@@ -140,7 +140,7 @@ Evaluate if goal was completed AND if approach was smart.
                 "prompt": prompt,
                 "system": REFLECTOR_SYSTEM,
                 "stream": False,
-                "temperature": 0.1  # Low temp for consistent evaluation
+                "temperature": 0.1 # Low temp for consistent evaluation
             },
             timeout=TIMEOUT
         )

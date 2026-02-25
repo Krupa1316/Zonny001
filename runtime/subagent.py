@@ -62,13 +62,13 @@ class SubAgentRunner:
         max_iters = self.manifest.get("max_iterations", 4)
         agent_name = self.manifest.get("name", "unknown")
         
-        print(f"\n🤖 SubAgent '{agent_name}' started")
-        print(f"   Task: {task}")
-        print(f"   Max iterations: {max_iters}")
+        print(f"\n[BOT] SubAgent '{agent_name}' started")
+        print(f" Task: {task}")
+        print(f" Max iterations: {max_iters}")
         
         for step in range(max_iters):
             self.iteration = step + 1
-            print(f"\n   💭 Iteration {self.iteration}/{max_iters}...")
+            print(f"\n Iteration {self.iteration}/{max_iters}...")
             
             # Build memory context (last 5 entries)
             memory_block = "\n".join(self.local_memory[-5:]) if self.local_memory else "None"
@@ -112,11 +112,11 @@ Choose your next action:"""
                 result = r.json()
                 reply = result.get("response", "").strip()
                 
-                print(f"      Agent says: {reply[:100]}...")
+                print(f" Agent says: {reply[:100]}...")
                 
             except Exception as e:
                 error_msg = f"LLM call failed: {e}"
-                print(f"      ❌ {error_msg}")
+                print(f" [FAIL] {error_msg}")
                 self.local_memory.append(error_msg)
                 continue
             
@@ -125,7 +125,7 @@ Choose your next action:"""
             # FINAL ANSWER
             if reply.startswith("FINAL:"):
                 final_answer = reply.replace("FINAL:", "").strip()
-                print(f"      ✅ Final answer ready")
+                print(f" [OK] Final answer ready")
                 return final_answer
             
             # TOOL CALL
@@ -136,42 +136,42 @@ Choose your next action:"""
                     tool_name = tool_name.strip()
                     tool_input = tool_input.strip()
                     
-                    print(f"      🔧 Calling tool: {tool_name}")
-                    print(f"         Input: {tool_input[:50]}...")
+                    print(f" [FIX] Calling tool: {tool_name}")
+                    print(f" Input: {tool_input[:50]}...")
                     
                     # Get tool
                     tool = self.tools.get(tool_name)
                     if not tool:
                         error_msg = f"Tool '{tool_name}' not found. Available: {list(self.tools.keys())}"
-                        print(f"      ❌ {error_msg}")
+                        print(f" [FAIL] {error_msg}")
                         self.local_memory.append(error_msg)
                         continue
                     
                     # Execute tool
                     try:
                         result = tool.execute(tool_input)
-                        result_str = str(result)[:200]  # Limit memory size
+                        result_str = str(result)[:200] # Limit memory size
                         self.local_memory.append(f"[{tool_name}] {result_str}")
-                        print(f"      ✅ Tool result: {result_str[:80]}...")
+                        print(f" [OK] Tool result: {result_str[:80]}...")
                     except Exception as e:
                         error_msg = f"Tool '{tool_name}' error: {e}"
-                        print(f"      ❌ {error_msg}")
+                        print(f" [FAIL] {error_msg}")
                         self.local_memory.append(error_msg)
                     
                     continue
                 else:
                     error_msg = "Invalid TOOL format. Use: TOOL:<name>:<input>"
-                    print(f"      ❌ {error_msg}")
+                    print(f" [FAIL] {error_msg}")
                     self.local_memory.append(error_msg)
                     continue
             
             # Unknown format - treat as thought/reasoning
-            print(f"      💬 Agent thinking: {reply[:80]}...")
+            print(f" [CHAT] Agent thinking: {reply[:80]}...")
             self.local_memory.append(reply[:200])
         
         # Max iterations reached
         final_answer = f"[{agent_name}] Max iterations ({max_iters}) reached. Last memory: {self.local_memory[-1] if self.local_memory else 'none'}"
-        print(f"\n   ⏱️  Iteration limit reached")
+        print(f"\n ⏱️ Iteration limit reached")
         return final_answer
     
     def get_memory(self) -> List[str]:

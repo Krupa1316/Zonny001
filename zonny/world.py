@@ -79,36 +79,36 @@ class WorldState:
         
         if self.files:
             parts.append(f"Known Files ({len(self.files)}):")
-            for f in self.files[:10]:  # Limit to 10 for brevity
+            for f in self.files[:10]: # Limit to 10 for brevity
                 if isinstance(f, dict):
                     name = f.get('name', str(f))
                     size = f.get('size', '')
                     size_str = f" ({size} bytes)" if size else ""
-                    parts.append(f"  - {name}{size_str}")
+                    parts.append(f" - {name}{size_str}")
                 else:
-                    parts.append(f"  - {f}")
+                    parts.append(f" - {f}")
             if len(self.files) > 10:
-                parts.append(f"  ... and {len(self.files) - 10} more")
+                parts.append(f" ... and {len(self.files) - 10} more")
             parts.append("")
         
         if self.observations:
             parts.append("Observations So Far:")
-            for i, obs in enumerate(self.observations[-5:], 1):  # Last 5
-                parts.append(f"  {i}. {obs}")
+            for i, obs in enumerate(self.observations[-5:], 1): # Last 5
+                parts.append(f" {i}. {obs}")
             if len(self.observations) > 5:
-                parts.append(f"  ... ({len(self.observations) - 5} earlier observations)")
+                parts.append(f" ... ({len(self.observations) - 5} earlier observations)")
             parts.append("")
         
         if self.errors:
             parts.append("Errors Encountered:")
             for err in self.errors:
-                parts.append(f"  ⚠️  {err}")
+                parts.append(f" [WARN]️ {err}")
             parts.append("")
         
         if self.action_history:
             parts.append("Actions Taken:")
-            for action in self.action_history[-3:]:  # Last 3
-                parts.append(f"  → {action.get('action', 'unknown')} {action.get('args', {})}")
+            for action in self.action_history[-3:]: # Last 3
+                parts.append(f" → {action.get('action', 'unknown')} {action.get('args', {})}")
             parts.append("")
         
         # Include actual file contents so LLM can summarize them

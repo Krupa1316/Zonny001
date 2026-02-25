@@ -1,5 +1,5 @@
 """
-zonny-mcp  entry point
+zonny-mcp entry point
 -----------------------
 Starts the Zonny MCP stdio server for Claude Desktop / MCP clients.
 
@@ -23,7 +23,7 @@ import sys
 def start():
     """Launch the MCP stdio server."""
     import importlib
-    print("🤖 Starting Zonny MCP Server...", flush=True)
+    print("[BOT] Starting Zonny MCP Server...", flush=True)
 
     # Import from the top-level mcp_server module
     mcp_module = importlib.import_module("mcp_server")

@@ -117,7 +117,7 @@ def write_file(path: str, content: str, root: str = None) -> str:
             f"Close any editor/process using it and try again."
         )
 
-    return f"✅ Written {len(content)} bytes to {path}"
+    return f"[OK] Written {len(content)} bytes to {path}"
 
 
 def list_files(directory: str = ".", root: str = None) -> str:
@@ -141,19 +141,19 @@ def list_files(directory: str = ".", root: str = None) -> str:
     try:
         entries = sorted(abs_path.iterdir())
     except PermissionError:
-        return f"🔒 Permission denied reading directory '{directory}'"
+        return f"[LOCKED] Permission denied reading directory '{directory}'"
 
     for item in entries:
         try:
             if item.is_dir():
-                items.append(f"📁 {item.name}/")
+                items.append(f"[DIR] {item.name}/")
             else:
                 size = item.stat().st_size
-                items.append(f"📄 {item.name} ({size:,} bytes)")
+                items.append(f"[DOC] {item.name} ({size:,} bytes)")
         except OSError:
-            items.append(f"⚠️  {item.name} (unreadable)")
+            items.append(f"[WARN]️ {item.name} (unreadable)")
 
-    return "\n".join(items) if items else "📭 Empty directory"
+    return "\n".join(items) if items else " Empty directory"
 
 
 def search_files(pattern: str, directory: str = ".", root: str = None) -> str:
@@ -196,11 +196,11 @@ def search_files(pattern: str, directory: str = ".", root: str = None) -> str:
             # Always use forward slashes in output for cross-platform consistency
             rel_str = rel_path.as_posix()
             if match.is_dir():
-                results.append(f"📁 {rel_str}/")
+                results.append(f"[DIR] {rel_str}/")
             else:
-                results.append(f"📄 {rel_str}")
+                results.append(f"[DOC] {rel_str}")
         except (ValueError, OSError):
-            results.append(f"📄 {match.name}")
+            results.append(f"[DOC] {match.name}")
 
     return "\n".join(results)
 

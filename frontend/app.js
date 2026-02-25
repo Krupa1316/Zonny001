@@ -193,7 +193,7 @@ function renderConversation(conversation, specialist, userQuery) {
   els.convoThread.scrollTop = els.convoThread.scrollHeight;
 }
 els.clearConvo.addEventListener('click', () => {
-  els.convoThread.innerHTML = `<div class="convo-empty"><div class="welcome-icon">🤝</div><h3>Agent Conversation</h3><p>Discussion will appear here after you chat.</p></div>`;
+  els.convoThread.innerHTML = `<div class="convo-empty"><div class="welcome-icon"></div><h3>Agent Conversation</h3><p>Discussion will appear here after you chat.</p></div>`;
   els.convoMeta.textContent = 'No conversation yet.';
 });
 
@@ -222,7 +222,7 @@ function renderTree(entries) {
   entries.forEach(e => {
     const item = document.createElement('div');
     item.className = 'tree-item' + (e.type === 'directory' ? ' tree-dir' : '');
-    const icon = e.type === 'directory' ? '📁' : fileIcon(e.ext || '');
+    const icon = e.type === 'directory' ? '[DIR]' : fileIcon(e.ext || '');
     item.innerHTML = `<span class="tree-icon">${icon}</span><span class="tree-name">${escHtml(e.name)}</span>`;
     item.addEventListener('click', () => {
       if (e.type === 'directory') loadFileTree(e.path);
@@ -233,8 +233,8 @@ function renderTree(entries) {
   });
 }
 function fileIcon(ext) {
-  const m = { 'py': '🐍', 'js': '📜', 'ts': '📜', 'html': '🌐', 'css': '🎨', 'json': '📋', 'md': '📝', 'txt': '📄', 'sh': '⚙', 'yaml': '⚙', 'yml': '⚙' };
-  return m[ext] || '📄';
+  const m = { 'py': '', 'js': '', 'ts': '', 'html': '[WORLD]', 'css': '[DESIGN]', 'json': '[LIST]', 'md': '[NOTE]', 'txt': '[DOC]', 'sh': '[GEAR]', 'yaml': '[GEAR]', 'yml': '[GEAR]' };
+  return m[ext] || '[DOC]';
 }
 function extFromName(name) { return name.split('.').pop().toLowerCase(); }
 
@@ -272,7 +272,7 @@ async function openFile(path, name) {
 function addEditorTab(path, name) {
   const hint = els.editorTabsBar.querySelector('.no-file-hint'); if (hint) hint.remove();
   const tab = document.createElement('div'); tab.className = 'editor-tab'; tab.dataset.path = path;
-  tab.innerHTML = `<span>${escHtml(name)}</span><span class="editor-tab-close" data-close="${path}">✕</span>`;
+  tab.innerHTML = `<span>${escHtml(name)}</span><span class="editor-tab-close" data-close="${path}"></span>`;
   tab.addEventListener('click', e => {
     if (e.target.dataset.close) { closeTab(e.target.dataset.close); return; }
     switchToTab(path);
@@ -336,8 +336,8 @@ const AGENT_COLORS = {
   qa_agent: 'agent-qa', reviewer_agent: 'agent-reviewer',
 };
 const AGENT_ICONS = {
-  ceo_agent: '👔', architect_agent: '🏗', frontend_agent: '🎨',
-  backend_agent: '⚙', qa_agent: '🧪', reviewer_agent: '✅',
+  ceo_agent: '[CEO]', architect_agent: '[ARCH]', frontend_agent: '[DESIGN]',
+  backend_agent: '[GEAR]', qa_agent: '[TEST]', reviewer_agent: '[OK]',
 };
 function setPipeStage(agent, status) {
   const el = document.querySelector(`.pipe-stage[data-agent="${agent}"]`);
@@ -353,7 +353,7 @@ function resetPipeline() {
 function addCompanyMsg(agent, content) {
   const empty = els.companyTranscript.querySelector('.company-empty'); if (empty) empty.remove();
   const colorClass = AGENT_COLORS[agent] || 'agent-ceo';
-  const icon = AGENT_ICONS[agent] || '🤖';
+  const icon = AGENT_ICONS[agent] || '[BOT]';
   const label = agent.replace('_agent', '').replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
   const msg = document.createElement('div'); msg.className = 'company-msg';
   // Render code blocks separately
@@ -475,7 +475,7 @@ window.addEventListener('message', (e) => {
       updateRepairStatus('failed', `Repair failed after ${MAX_REPAIR_ATTEMPTS} attempts`);
     }
   } else if (e.data.type === 'preview-ok') {
-    updateRepairStatus('ok', '✓ Running');
+    updateRepairStatus('ok', ' Running');
   }
 });
 
@@ -483,7 +483,7 @@ async function triggerRepair(errors) {
   repairing = true;
   repairAttempt++;
   updateRepairStatus('repairing', `Repairing (attempt ${repairAttempt}/${MAX_REPAIR_ATTEMPTS})…`);
-  addCompanyMsg('system', `🔧 Auto-repair attempt ${repairAttempt}: ${errors.length} error(s) detected. Agents are fixing…`);
+  addCompanyMsg('system', `[FIX] Auto-repair attempt ${repairAttempt}: ${errors.length} error(s) detected. Agents are fixing…`);
 
   const body = JSON.stringify({ session: companySession, errors, attempt: repairAttempt });
   try {
@@ -500,7 +500,7 @@ async function triggerRepair(errors) {
         try {
           const ev = JSON.parse(line.slice(5).trim());
           if (ev.type === 'repair_start') {
-            addCompanyMsg('system', `📋 Reading ${ev.file_count} files, fixing ${ev.error_count} errors…`);
+            addCompanyMsg('system', `[LIST] Reading ${ev.file_count} files, fixing ${ev.error_count} errors…`);
           } else if (ev.type === 'message') {
             addCompanyMsg(ev.agent, ev.content);
             if (ev.files_extracted?.length) {
@@ -508,7 +508,7 @@ async function triggerRepair(errors) {
             }
           } else if (ev.type === 'done') {
             const fixed = ev.files_fixed || [];
-            addCompanyMsg('system', `✅ Repair attempt ${ev.attempt} complete. Fixed: ${fixed.join(', ') || 'none'}`);
+            addCompanyMsg('system', `[OK] Repair attempt ${ev.attempt} complete. Fixed: ${fixed.join(', ') || 'none'}`);
             // Reload preview to test the fixes
             if (fixed.length > 0) {
               updateRepairStatus('loading', 'Reloading preview…');
@@ -519,14 +519,14 @@ async function triggerRepair(errors) {
               updateRepairStatus('failed', 'No files were fixed');
             }
           } else if (ev.type === 'error') {
-            addCompanyMsg('system', `❌ Repair error: ${ev.content}`);
+            addCompanyMsg('system', `[FAIL] Repair error: ${ev.content}`);
             updateRepairStatus('failed', 'Repair error');
           }
         } catch (e) { }
       }
     }
   } catch (e) {
-    addCompanyMsg('system', `❌ Repair failed: ${e.message}`);
+    addCompanyMsg('system', `[FAIL] Repair failed: ${e.message}`);
     updateRepairStatus('failed', 'Repair connection failed');
   } finally {
     repairing = false;

@@ -37,7 +37,7 @@ class GeneralAgent(Agent):
         session = context.get('session', 'unknown')
         
         if not input:
-            return "👋 Hello! I'm the general agent. How can I help?"
+            return " Hello! I'm the general agent. How can I help?"
         
         # Slice E: Retrieve relevant memories
         memories = retrieve(input, session, self.name, k=3)
@@ -74,12 +74,12 @@ Be friendly, concise, and helpful.{memory_context}"""
                 result = response.json()
                 llm_response = result.get("response", "No response from LLM")
             else:
-                llm_response = f"❌ LLM error: {response.status_code}"
+                llm_response = f"[FAIL] LLM error: {response.status_code}"
                 
         except requests.exceptions.ConnectionError:
-            llm_response = "❌ Cannot connect to Ollama. Is it running?\n\nRun: ollama serve"
+            llm_response = "[FAIL] Cannot connect to Ollama. Is it running?\n\nRun: ollama serve"
         except Exception as e:
-            llm_response = f"❌ Error calling LLM: {e}"
+            llm_response = f"[FAIL] Error calling LLM: {e}"
         
         # Store assistant response
         store(llm_response, session, self.name, "assistant")

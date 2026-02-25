@@ -23,8 +23,8 @@ def start(project_root: str):
     Args:
         project_root: Absolute path to the directory where 'zonny' was invoked
     """
-    print(f"🚀 Zonny initialized in: {project_root}")
-    print(f"📁 Working directory: {os.path.basename(project_root)}")
+    print(f"[START] Zonny initialized in: {project_root}")
+    print(f"[DIR] Working directory: {os.path.basename(project_root)}")
     print()
     
     # Start the agent loop

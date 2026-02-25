@@ -19,9 +19,9 @@ class AgentManifest:
     description: str
     system_prompt: str
     tools: List[str]
-    context_scope: str  # "shared" or "isolated"
+    context_scope: str # "shared" or "isolated"
     max_iterations: int
-    priority: str  # "low", "medium", "high", "critical"
+    priority: str # "low", "medium", "high", "critical"
     enabled: bool
     metadata: Dict[str, Any]
     
@@ -131,7 +131,7 @@ class ManifestLoader:
                 manifest = self.load_manifest(yaml_path)
                 manifests[manifest.name] = manifest
             except Exception as e:
-                print(f"⚠️  Warning: Failed to load {yaml_path.name}: {e}")
+                print(f"[WARN]️ Warning: Failed to load {yaml_path.name}: {e}")
         
         return manifests
     
@@ -156,21 +156,21 @@ class ManifestLoader:
 def print_manifest_summary(manifest: AgentManifest):
     """Pretty print a manifest summary"""
     print(f"\n{'='*70}")
-    print(f"📄 Agent: {manifest.name}")
+    print(f"[DOC] Agent: {manifest.name}")
     print(f"{'='*70}")
     print(f"Description: {manifest.description}")
     print(f"Context Scope: {manifest.context_scope}")
     print(f"Priority: {manifest.priority}")
     print(f"Max Iterations: {manifest.max_iterations}")
-    print(f"Enabled: {'✅' if manifest.enabled else '❌'}")
-    print(f"\n🔧 Tools ({len(manifest.tools)}):")
+    print(f"Enabled: {'[OK]' if manifest.enabled else '[FAIL]'}")
+    print(f"\n[FIX] Tools ({len(manifest.tools)}):")
     for tool in manifest.tools:
-        print(f"   - {tool}")
-    print(f"\n💬 System Prompt:")
+        print(f" - {tool}")
+    print(f"\n[CHAT] System Prompt:")
     # Show first 2 lines of prompt
     lines = manifest.system_prompt.strip().split('\n')
     for line in lines[:2]:
-        print(f"   {line}")
+        print(f" {line}")
     if len(lines) > 2:
-        print(f"   ... ({len(lines)-2} more lines)")
+        print(f" ... ({len(lines)-2} more lines)")
     print()

@@ -35,7 +35,7 @@ class CodeAgent(Agent):
     
     def __init__(self):
         super().__init__()
-        self.tool_used = False  # Track if we've used a tool
+        self.tool_used = False # Track if we've used a tool
     
     def run(self, input: str, context: dict) -> str:
         """
@@ -58,11 +58,11 @@ class CodeAgent(Agent):
         # Check if this is a tool result (feedback loop)
         if "Tool '" in input and " result:" in input:
             # We got tool output - use LLM for intelligent response
-            self.tool_used = False  # Reset for next query
+            self.tool_used = False # Reset for next query
             
             # Extract tool output
             lines = input.split('\n')
-            tool_output = '\n'.join(lines[1:]) if len(lines) > 1 else input  # Skip first line
+            tool_output = '\n'.join(lines[1:]) if len(lines) > 1 else input # Skip first line
             
             # Store tool result in memory
             store(tool_output[:500], session, self.name, "assistant")
@@ -93,10 +93,10 @@ Be concise but informative."""
                     final_answer = result.get("response", tool_output[:1000])
                 else:
                     # Fallback to raw output
-                    final_answer = f"💻 Tool Result:\n\n{tool_output[:1000]}"
+                    final_answer = f"[CODE] Tool Result:\n\n{tool_output[:1000]}"
             except:
                 # Fallback to raw output
-                final_answer = f"💻 Tool Result:\n\n{tool_output[:1000]}"
+                final_answer = f"[CODE] Tool Result:\n\n{tool_output[:1000]}"
             
             return json.dumps({"final": final_answer})
         
@@ -118,12 +118,12 @@ Be concise but informative."""
             # Extract filename if mentioned
             filename = None
             for word in input.split():
-                if "." in word and "/" not in word:  # Simple filename detection
+                if "." in word and "/" not in word: # Simple filename detection
                     filename = word.strip('.,!?')
                     break
             
             if not filename:
-                filename = "server.py"  # Default file
+                filename = "server.py" # Default file
             
             tool_call = {
                 "tool": "read_file",
@@ -148,7 +148,7 @@ Be concise but informative."""
         if "search" in input_lower or "find" in input_lower:
             
             # Extract pattern
-            pattern = "*.py"  # Default pattern
+            pattern = "*.py" # Default pattern
             if ".py" in input_lower:
                 pattern = "*.py"
             elif ".js" in input_lower:
@@ -198,9 +198,9 @@ For now, provide helpful code guidance.{memory_context}{workspace_context}"""
                 result = llm_response.json()
                 final_answer = result.get("response", "No response from LLM")
             else:
-                final_answer = f"❌ LLM error: {llm_response.status_code}"
+                final_answer = f"[FAIL] LLM error: {llm_response.status_code}"
         except Exception as e:
-            final_answer = f"❌ Error: {e}"
+            final_answer = f"[FAIL] Error: {e}"
         
         # Store response
         store(final_answer, session, self.name, "assistant")

@@ -1,5 +1,5 @@
 """
-🤖 MCP Coding Agent Server
+[BOT] MCP Coding Agent Server
 
 A lightweight coding assistant MCP server that works like VS Code Copilot.
 Uses your local Ollama + ChromaDB for intelligent code assistance.
@@ -35,7 +35,7 @@ _memory = None
 def get_orchestrator():
     """Lazy import orchestrator"""
     global _orchestrator
-    if _orchestrator  is None:
+    if _orchestrator is None:
         from orchestrator import orchestrate, call_ollama
         _orchestrator = {'orchestrate': orchestrate, 'call_ollama': call_ollama}
     return _orchestrator
@@ -55,7 +55,7 @@ app = Server("local-coding-agent")
 WORKSPACE_ROOT = Path(__file__).parent
 
 # ============================================
-# 🛠️ CODING AGENT TOOLS
+# [TOOL]️ CODING AGENT TOOLS
 # ============================================
 
 @app.list_tools()
@@ -216,7 +216,7 @@ async def call_tool(name: str, arguments: Any) -> list[types.TextContent]:
 
 
 # ============================================
-# 📁 TOOL IMPLEMENTATIONS
+# [DIR] TOOL IMPLEMENTATIONS
 # ============================================
 
 async def tool_read_file(path: str) -> list[types.TextContent]:
@@ -226,25 +226,25 @@ async def tool_read_file(path: str) -> list[types.TextContent]:
     if not file_path.exists():
         return [types.TextContent(
             type="text",
-            text=f"❌ File not found: {path}"
+            text=f"[FAIL] File not found: {path}"
         )]
     
     if file_path.is_dir():
         return [types.TextContent(
             type="text",
-            text=f"❌ Path is a directory: {path}"
+            text=f"[FAIL] Path is a directory: {path}"
         )]
     
     try:
         content = file_path.read_text(encoding='utf-8')
         return [types.TextContent(
             type="text",
-            text=f"📄 {path}\n\n```\n{content}\n```"
+            text=f"[DOC] {path}\n\n```\n{content}\n```"
         )]
     except Exception as e:
         return [types.TextContent(
             type="text",
-            text=f"❌ Error reading file: {e}"
+            text=f"[FAIL] Error reading file: {e}"
         )]
 
 
@@ -255,25 +255,25 @@ async def tool_list_directory(path: str) -> list[types.TextContent]:
     if not dir_path.exists():
         return [types.TextContent(
             type="text",
-            text=f"❌ Directory not found: {path}"
+            text=f"[FAIL] Directory not found: {path}"
         )]
     
     if not dir_path.is_dir():
         return [types.TextContent(
             type="text",
-            text=f"❌ Path is not a directory: {path}"
+            text=f"[FAIL] Path is not a directory: {path}"
         )]
     
     items = []
     for item in sorted(dir_path.iterdir()):
         if item.name.startswith('.'):
             continue
-        icon = "📁" if item.is_dir() else "📄"
+        icon = "[DIR]" if item.is_dir() else "[DOC]"
         items.append(f"{icon} {item.name}")
     
     return [types.TextContent(
         type="text",
-        text=f"📂 {path}\n\n" + "\n".join(items)
+        text=f"[DIR] {path}\n\n" + "\n".join(items)
     )]
 
 
@@ -291,11 +291,11 @@ async def tool_search_code(query: str, file_pattern: str) -> list[types.TextCont
                 
                 for i, line in enumerate(content.splitlines(), 1):
                     if pattern.search(line):
-                        matches.append(f"  Line {i}: {line.strip()}")
+                        matches.append(f" Line {i}: {line.strip()}")
                 
                 if matches:
                     rel_path = file_path.relative_to(WORKSPACE_ROOT)
-                    results.append(f"📄 {rel_path}\n" + "\n".join(matches))
+                    results.append(f"[DOC] {rel_path}\n" + "\n".join(matches))
             except:
                 pass
     
@@ -358,20 +358,20 @@ async def tool_get_project_context(focus: str) -> list[types.TextContent]:
             # Key files
             if file_path.name in ['server.py', 'orchestrator.py', 'memory.py', 'README.md', 'requirements.txt']:
                 rel_path = file_path.relative_to(WORKSPACE_ROOT)
-                structure.append(f"📄 {rel_path}")
+                structure.append(f"[DOC] {rel_path}")
     
-    file_summary = "\n".join([f"  {ext}: {count} files" for ext, count in sorted(file_types.items())])
-    key_files = "\n".join(structure) if structure else "  (analyzing...)"
+    file_summary = "\n".join([f" {ext}: {count} files" for ext, count in sorted(file_types.items())])
+    key_files = "\n".join(structure) if structure else " (analyzing...)"
     
-    context = f"""🏗️ Project Context
+    context = f"""[ARCH]️ Project Context
 
-📁 File Types:
+[DIR] File Types:
 {file_summary}
 
-🔑 Key Files:
+ Key Files:
 {key_files}
 
-💡 Focus: {focus}
+[IDEA] Focus: {focus}
 """
     
     return [types.TextContent(
@@ -418,7 +418,7 @@ Completion:"""
 
 
 # ============================================
-# 📚 RESOURCES (Optional)
+# RESOURCES (Optional)
 # ============================================
 
 @app.list_resources()
@@ -453,7 +453,7 @@ async def read_resource(uri: str) -> str:
 
 
 # ============================================
-# 🚀 MAIN
+# [START] MAIN
 # ============================================
 
 async def main():
@@ -467,5 +467,5 @@ async def main():
 
 
 if __name__ == "__main__":
-    print("🤖 Starting Local Coding Agent MCP Server...", flush=True)
+    print("[BOT] Starting Local Coding Agent MCP Server...", flush=True)
     asyncio.run(main())

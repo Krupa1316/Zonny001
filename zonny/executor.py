@@ -72,7 +72,7 @@ def execute_plan(plan: dict, context: dict, verbose: bool = True) -> dict:
                 "task": task,
                 "tool": tool,
                 "result": result,
-                "success": not result.startswith("❌") if isinstance(result, str) else True
+                "success": not result.startswith("[FAIL]") if isinstance(result, str) else True
             }
             
             results.append(step_result)
@@ -80,7 +80,7 @@ def execute_plan(plan: dict, context: dict, verbose: bool = True) -> dict:
             # If step failed, decide whether to continue
             if not step_result["success"]:
                 if verbose:
-                    print(f"  ⚠️  Step {step_num} had errors, continuing...")
+                    print(f" [WARN]️ Step {step_num} had errors, continuing...")
         
         # All steps completed
         return {
@@ -116,11 +116,11 @@ def format_execution_summary(execution: dict) -> str:
     """
     lines = []
     
-    lines.append(f"🎯 Goal: {execution['goal']}")
-    lines.append(f"✓ Completed: {execution['steps_completed']}/{execution['total_steps']} steps")
+    lines.append(f"[TARGET] Goal: {execution['goal']}")
+    lines.append(f" Completed: {execution['steps_completed']}/{execution['total_steps']} steps")
     
     if execution.get("error"):
-        lines.append(f"❌ Error: {execution['error']}")
+        lines.append(f"[FAIL] Error: {execution['error']}")
     
     lines.append("")
     lines.append("Results:")
@@ -131,13 +131,13 @@ def format_execution_summary(execution: dict) -> str:
         success = step_result["success"]
         result = step_result["result"]
         
-        status = "✓" if success else "⚠️"
+        status = "" if success else "[WARN]️"
         lines.append(f"{status} Step {step_num}: {task}")
         
         # Show result preview (first 200 chars)
         if isinstance(result, str):
             preview = result[:200] + "..." if len(result) > 200 else result
-            lines.append(f"   {preview}")
+            lines.append(f" {preview}")
         
         lines.append("")
     

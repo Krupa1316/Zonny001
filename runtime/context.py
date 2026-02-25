@@ -1,5 +1,5 @@
 """
-🗂️ Execution Context
+️ Execution Context
 
 Holds EVERYTHING about a task execution.
 

@@ -1,5 +1,5 @@
 """
-🧠 Orchestrator Agent Architecture
+[BRAIN] Orchestrator Agent Architecture
 
 Flow:
 1. Decider analyzes user intent → returns JSON
@@ -17,12 +17,12 @@ OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "nemotron-3-nano:latest"
 
 # ============================================
-# 🛠 SPECIALIST AGENT FUNCTIONS
+# [TOOL] SPECIALIST AGENT FUNCTIONS
 # ============================================
 
 def document_agent(query: str, document_id: str, conversation_id: str, top_k: int = 5) -> str:
     """
-    📄 Document Agent
+    [DOC] Document Agent
     Retrieves relevant chunks from uploaded documents.
     """
     from sentence_transformers import SentenceTransformer
@@ -53,7 +53,7 @@ def document_agent(query: str, document_id: str, conversation_id: str, top_k: in
 
 def memory_agent(query: str, conversation_id: str, top_k: int = 4) -> str:
     """
-    🧩 Memory Agent
+    [MODULE] Memory Agent
     Retrieves relevant conversation history.
     """
     from sentence_transformers import SentenceTransformer
@@ -90,7 +90,7 @@ def memory_agent(query: str, conversation_id: str, top_k: int = 4) -> str:
 
 def code_agent(query: str) -> str:
     """
-    💻 Code Agent
+    [CODE] Code Agent
     Provides code-specific context and help.
     Currently returns guidance message - can be expanded.
     """
@@ -103,7 +103,7 @@ def code_agent(query: str) -> str:
 
 
 # ============================================
-# 🧠 ORCHESTRATOR DECIDER
+# [BRAIN] ORCHESTRATOR DECIDER
 # ============================================
 
 def call_ollama(prompt: str, system: str = None) -> str:
@@ -114,7 +114,7 @@ def call_ollama(prompt: str, system: str = None) -> str:
         "model": MODEL,
         "prompt": full_prompt,
         "stream": False
-    }, timeout=120)  # Slice E: Match other timeouts (120s for local model)
+    }, timeout=120) # Slice E: Match other timeouts (120s for local model)
     
     result = json.loads(response.text.strip().splitlines()[-1])
     return result["response"]
@@ -122,7 +122,7 @@ def call_ollama(prompt: str, system: str = None) -> str:
 
 def decide_agents(user_message: str) -> dict:
     """
-    🧠 Step 1: Decider analyzes user intent
+    [BRAIN] Step 1: Decider analyzes user intent
     Returns which agents to invoke
     """
     
@@ -171,7 +171,7 @@ Respond with JSON only:"""
 
 def execute_agents(decision: dict, user_message: str, conversation_id: str, document_id: str = None) -> dict:
     """
-    🛠 Step 2: Execute specialist agent functions
+    [TOOL] Step 2: Execute specialist agent functions
     Returns gathered context from each agent
     """
     
@@ -192,7 +192,7 @@ def execute_agents(decision: dict, user_message: str, conversation_id: str, docu
 
 def synthesize_response(user_message: str, context: dict, decision: dict) -> str:
     """
-    🧠 Step 3: Final LLM call to synthesize response
+    [BRAIN] Step 3: Final LLM call to synthesize response
     Uses gathered context to produce final answer
     """
     
@@ -223,7 +223,7 @@ Provide a helpful response:"""
 
 
 # ============================================
-# 🎯 MAIN ORCHESTRATOR
+# [TARGET] MAIN ORCHESTRATOR
 # ============================================
 
 def orchestrate(user_message: str, conversation_id: str, document_id: str = None) -> tuple[str, dict]:

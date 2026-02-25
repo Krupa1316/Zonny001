@@ -137,7 +137,7 @@ def generate_report(analysis: dict, detailed: bool = True) -> str:
     for ext, files in sorted_types:
         total_size = sum(f['size'] for f in files)
         display_ext = ext if ext else "no extension"
-        report_lines.append(f"{display_ext:20} {len(files):3} files  {format_bytes(total_size):>12}")
+        report_lines.append(f"{display_ext:20} {len(files):3} files {format_bytes(total_size):>12}")
     
     report_lines.append("")
     
@@ -147,8 +147,8 @@ def generate_report(analysis: dict, detailed: bool = True) -> str:
     report_lines.append("-" * 80)
     
     if analysis['directories']:
-        for directory in sorted(analysis['directories'])[:20]:  # Top 20
-            report_lines.append(f"📁 {directory}")
+        for directory in sorted(analysis['directories'])[:20]: # Top 20
+            report_lines.append(f"[DIR] {directory}")
     else:
         report_lines.append("(Flat structure - no subdirectories)")
     
@@ -160,7 +160,7 @@ def generate_report(analysis: dict, detailed: bool = True) -> str:
         report_lines.append("DOCUMENTATION FILES")
         report_lines.append("-" * 80)
         for doc in sorted(analysis['documentation']):
-            report_lines.append(f"📄 {doc}")
+            report_lines.append(f"[DOC] {doc}")
         report_lines.append("")
     
     # Test files
@@ -169,7 +169,7 @@ def generate_report(analysis: dict, detailed: bool = True) -> str:
         report_lines.append("TEST FILES")
         report_lines.append("-" * 80)
         for test in sorted(analysis['test_files']):
-            report_lines.append(f"🧪 {test}")
+            report_lines.append(f"[TEST] {test}")
         report_lines.append("")
     
     # Key Python files (if any)
@@ -183,7 +183,7 @@ def generate_report(analysis: dict, detailed: bool = True) -> str:
         main_py = [f for f in py_files if '/' not in f['path'] and '\\' not in f['path']]
         
         for py_file in sorted(main_py, key=lambda x: x['name']):
-            report_lines.append(f"🐍 {py_file['path']:40} {format_bytes(py_file['size']):>12}")
+            report_lines.append(f" {py_file['path']:40} {format_bytes(py_file['size']):>12}")
         
         if len(py_files) > len(main_py):
             report_lines.append(f"... and {len(py_files) - len(main_py)} more Python files in subdirectories")
@@ -200,16 +200,16 @@ def generate_report(analysis: dict, detailed: bool = True) -> str:
     # Check for common patterns
     if len(analysis['test_files']) > 0:
         coverage = len(analysis['test_files']) / max(1, len(analysis['code_files'])) * 100
-        insights.append(f"✅ Testing: {len(analysis['test_files'])} test files ({coverage:.0f}% test coverage ratio)")
+        insights.append(f"[OK] Testing: {len(analysis['test_files'])} test files ({coverage:.0f}% test coverage ratio)")
     else:
-        insights.append("⚠️  No test files detected")
+        insights.append("[WARN]️ No test files detected")
     
     if len(analysis['documentation']) > 5:
-        insights.append(f"✅ Well documented: {len(analysis['documentation'])} documentation files")
+        insights.append(f"[OK] Well documented: {len(analysis['documentation'])} documentation files")
     elif len(analysis['documentation']) > 0:
-        insights.append(f"📝 Some documentation: {len(analysis['documentation'])} files")
+        insights.append(f"[NOTE] Some documentation: {len(analysis['documentation'])} files")
     else:
-        insights.append("⚠️  No documentation files detected")
+        insights.append("[WARN]️ No documentation files detected")
     
     # Check for specific files
     all_files = set()
@@ -217,16 +217,16 @@ def generate_report(analysis: dict, detailed: bool = True) -> str:
         all_files.update(f['path'] for f in files_list)
     
     if 'requirements.txt' in all_files:
-        insights.append("✅ Python dependencies: requirements.txt found")
+        insights.append("[OK] Python dependencies: requirements.txt found")
     
     if 'server.py' in all_files or 'main.py' in all_files:
-        insights.append("✅ Server application detected")
+        insights.append("[OK] Server application detected")
     
     if any('agent' in f.lower() for f in all_files):
-        insights.append("✅ Agent-based architecture detected")
+        insights.append("[OK] Agent-based architecture detected")
     
     for insight in insights:
-        report_lines.append(f"  {insight}")
+        report_lines.append(f" {insight}")
     
     report_lines.append("")
     
@@ -276,7 +276,7 @@ def create_workspace_report(output_file: str = "report.txt", detailed: bool = Tr
         
         file_size = len(report.encode('utf-8'))
         
-        return f"✅ Comprehensive workspace report written to {output_file} ({format_bytes(file_size)})\n\nSummary:\n- {analysis['total_files']} files analyzed\n- {len(analysis['directories'])} directories\n- {len(analysis['documentation'])} documentation files\n- {len(analysis['code_files'])} code files\n- {len(analysis['test_files'])} test files"
+        return f"[OK] Comprehensive workspace report written to {output_file} ({format_bytes(file_size)})\n\nSummary:\n- {analysis['total_files']} files analyzed\n- {len(analysis['directories'])} directories\n- {len(analysis['documentation'])} documentation files\n- {len(analysis['code_files'])} code files\n- {len(analysis['test_files'])} test files"
         
     except Exception as e:
-        return f"❌ Error creating report: {e}"
+        return f"[FAIL] Error creating report: {e}"

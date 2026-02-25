@@ -18,10 +18,10 @@ Key Principle:
 Every agent has: (memory namespace) = session_id + agent_name
 
 This ensures:
-✅ Code agent can't see docs agent memories
-✅ Router sees nothing (stateless)
-✅ Sessions don't cross
-✅ Agents remain focused
+[OK] Code agent can't see docs agent memories
+[OK] Router sees nothing (stateless)
+[OK] Sessions don't cross
+[OK] Agents remain focused
 """
 
 import chromadb

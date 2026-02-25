@@ -1,5 +1,5 @@
 """
-🔧 Base Interfaces
+[FIX] Base Interfaces
 
 Core contracts for agents and tools.
 Everything must conform to these interfaces.

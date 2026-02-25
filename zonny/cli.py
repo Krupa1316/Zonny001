@@ -8,10 +8,10 @@ A dumb pipe that:
 - Displays response
 
 DOES NOT:
-❌ Decide agents
-❌ Touch memory
-❌ Call Ollama
-❌ Know about tools
+[FAIL] Decide agents
+[FAIL] Touch memory
+[FAIL] Call Ollama
+[FAIL] Know about tools
 
 This is Zonny Protocol v1.
 """
@@ -39,24 +39,24 @@ def print_logo():
     """Print Zonny logo/header"""
     print("\n" + "="*70)
     print("""
-    ███████╗ ██████╗ ███╗   ██╗███╗   ██╗██╗   ██╗
-    ╚══███╔╝██╔═══██╗████╗  ██║████╗  ██║╚██╗ ██╔╝
-      ███╔╝ ██║   ██║██╔██╗ ██║██╔██╗ ██║ ╚████╔╝
-     ███╔╝  ██║   ██║██║╚██╗██║██║╚██╗██║  ╚██╔╝
-    ███████╗╚██████╔╝██║ ╚████║██║ ╚████║   ██║
-    ╚══════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝   ╚═╝
+    ███████╗ ██████╗ ███╗ ██╗███╗ ██╗██╗ ██╗
+    ╚══███╔╝██╔═══██╗████╗ ██║████╗ ██║╚██╗ ██╔╝
+      ███╔╝ ██║ ██║██╔██╗ ██║██╔██╗ ██║ ╚████╔╝
+     ███╔╝ ██║ ██║██║╚██╗██║██║╚██╗██║ ╚██╔╝
+    ███████╗╚██████╔╝██║ ╚████║██║ ╚████║ ██║
+    ╚══════╝ ╚═════╝ ╚═╝ ╚═══╝╚═╝ ╚═══╝ ╚═╝
     """)
-    print("    Welcome to the zone")
+    print(" Welcome to the zone")
     print("="*70)
 
 
 def print_hints():
     """Print usage hints"""
-    print("\n💡 Commands:")
-    print("   /agents    - List available agents")
-    print("   /help      - Show help")
-    print("   /exit      - Exit Zonny")
-    print("\n💬 Or just type a message to chat")
+    print("\n[IDEA] Commands:")
+    print(" /agents - List available agents")
+    print(" /help - Show help")
+    print(" /exit - Exit Zonny")
+    print("\n[CHAT] Or just type a message to chat")
     print()
 
 
@@ -98,19 +98,19 @@ def send_to_mcp(session_id: str, input_text: Optional[str] = None, command: Opti
         
     except requests.exceptions.ConnectionError:
         return {
-            "output": "❌ Cannot connect to MCP Gateway. Is the server running?\n   Run: python -m uvicorn server:app --reload"
+            "output": "[FAIL] Cannot connect to MCP Gateway. Is the server running?\n Run: python -m uvicorn server:app --reload"
         }
     except requests.exceptions.Timeout:
         return {
-            "output": "⏱️  Request timed out. The agent may be processing..."
+            "output": "⏱️ Request timed out. The agent may be processing..."
         }
     except requests.exceptions.RequestException as e:
         return {
-            "output": f"❌ Request failed: {e}"
+            "output": f"[FAIL] Request failed: {e}"
         }
     except Exception as e:
         return {
-            "output": f"❌ Unexpected error: {e}"
+            "output": f"[FAIL] Unexpected error: {e}"
         }
 
 
@@ -126,7 +126,7 @@ def render_response(response: dict):
     if output:
         print("\n" + output)
     else:
-        print("\n⚠️  No response from gateway")
+        print("\n[WARN]️ No response from gateway")
 
 
 def run_cli():
@@ -146,16 +146,16 @@ def run_cli():
     
     # Generate session ID
     session_id = str(uuid.uuid4())
-    print(f"📍 Session: {session_id[:8]}...\n")
+    print(f" Session: {session_id[:8]}...\n")
     
     # Input loop
     try:
         while True:
             # Read input
             try:
-                user_input = input("\n➜ Zonny > ").strip()
+                user_input = input("\n Zonny > ").strip()
             except EOFError:
-                print("\n👋 Goodbye!")
+                print("\n Goodbye!")
                 break
             
             if not user_input:
@@ -163,7 +163,7 @@ def run_cli():
             
             # Check for exit
             if user_input.lower() in ['/exit', 'exit', 'quit']:
-                print("\n👋 Goodbye!")
+                print("\n Goodbye!")
                 break
             
             # Check if command or input
@@ -179,7 +179,7 @@ def run_cli():
             render_response(response)
     
     except KeyboardInterrupt:
-        print("\n\n👋 Interrupted. Goodbye!")
+        print("\n\n Interrupted. Goodbye!")
         sys.exit(0)
 
 

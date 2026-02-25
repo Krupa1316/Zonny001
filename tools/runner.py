@@ -65,7 +65,7 @@ def run_tool(call: dict) -> str:
         result = tool_func(**args)
         return str(result)
     except Exception as e:
-        return f"❌ Tool error: {type(e).__name__}: {e}"
+        return f"[FAIL] Tool error: {type(e).__name__}: {e}"
 
 
 def parse_agent_output(output: str) -> dict:
@@ -148,4 +148,4 @@ def execute_tool_loop(agent, initial_input: str, context: dict, max_iterations: 
             # Unknown format - treat as final
             return agent_output
     
-    return f"⚠️ Max iterations ({max_iterations}) reached. Tool loop stopped."
+    return f"[WARN]️ Max iterations ({max_iterations}) reached. Tool loop stopped."

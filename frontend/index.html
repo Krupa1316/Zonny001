@@ -22,15 +22,15 @@
       <span class="brand-version">v0.4</span>
     </div>
     <nav class="header-tabs">
-      <button class="tab-btn active" data-tab="chat">💬 Chat</button>
-      <button class="tab-btn" data-tab="convo">🤖 Agent Log</button>
-      <button class="tab-btn" data-tab="ide">💻 IDE</button>
-      <button class="tab-btn" data-tab="company">🏢 Company</button>
+      <button class="tab-btn active" data-tab="chat">[CHAT] Chat</button>
+      <button class="tab-btn" data-tab="convo">[BOT] Agent Log</button>
+      <button class="tab-btn" data-tab="ide">[CODE] IDE</button>
+      <button class="tab-btn" data-tab="company">[COMPANY] Company</button>
       <button class="tab-btn" data-tab="preview">▶ Preview</button>
     </nav>
     <div class="header-actions">
       <span class="status-dot" id="status-dot"></span>
-      <button class="icon-btn" id="settings-btn" title="Settings">⚙</button>
+      <button class="icon-btn" id="settings-btn" title="Settings">[GEAR]</button>
     </div>
   </header>
 
@@ -51,7 +51,7 @@
       <section class="center-col">
         <div id="chat-thread">
           <div class="welcome-msg">
-            <div class="welcome-icon">⚡</div>
+            <div class="welcome-icon"></div>
             <h2>Ask Zonny anything</h2>
             <p>Specialized agents collaborate to answer.</p>
           </div>
@@ -59,17 +59,17 @@
         <div id="activity-panel">
           <div class="activity-header">
             <span>AGENT ACTIVITY</span>
-            <button class="icon-btn-sm" id="clear-activity">✕</button>
+            <button class="icon-btn-sm" id="clear-activity"></button>
           </div>
           <div id="activity-log">
             <p class="activity-hint">Activity will appear here…</p>
           </div>
         </div>
         <div id="input-bar">
-          <button class="icon-btn" id="upload-btn">📎</button>
+          <button class="icon-btn" id="upload-btn"></button>
           <input type="file" id="file-input" style="display:none" />
           <textarea id="chat-input" placeholder="Ask anything… (Enter to send)" rows="1"></textarea>
-          <button id="send-btn">➤</button>
+          <button id="send-btn"></button>
         </div>
       </section>
 
@@ -92,11 +92,11 @@
     <div id="tab-convo" class="tab-page">
       <div class="tab-topbar">
         <span class="convo-meta" id="convo-meta">No conversation yet.</span>
-        <button class="icon-btn-sm" id="clear-convo">✕</button>
+        <button class="icon-btn-sm" id="clear-convo"></button>
       </div>
       <div id="convo-thread">
         <div class="convo-empty">
-          <div class="welcome-icon">🤝</div>
+          <div class="welcome-icon"></div>
           <h3>Agent Conversation</h3>
           <p>Internal agent discussion will appear here after you chat.</p>
         </div>
@@ -113,7 +113,7 @@
         <div class="panel-label">
           FILES
           <span style="flex:1"></span>
-          <button class="icon-btn-sm" id="ide-browse-btn" title="Open folder">📂</button>
+          <button class="icon-btn-sm" id="ide-browse-btn" title="Open folder">[DIR]</button>
         </div>
         <div id="file-tree"></div>
         <div class="explorer-path" id="explorer-path">outputs/</div>
@@ -147,37 +147,37 @@
         <!-- Pipeline viz -->
         <div id="company-pipeline">
           <div class="pipe-stage" data-agent="ceo_agent">
-            <div class="pipe-icon">👔</div>
+            <div class="pipe-icon">[CEO]</div>
             <div class="pipe-label">CEO</div>
             <div class="pipe-status">idle</div>
           </div>
           <div class="pipe-arrow">→</div>
           <div class="pipe-stage" data-agent="architect_agent">
-            <div class="pipe-icon">🏗</div>
+            <div class="pipe-icon">[ARCH]</div>
             <div class="pipe-label">Arch</div>
             <div class="pipe-status">idle</div>
           </div>
           <div class="pipe-arrow">→</div>
           <div class="pipe-stage" data-agent="frontend_agent">
-            <div class="pipe-icon">🎨</div>
+            <div class="pipe-icon">[DESIGN]</div>
             <div class="pipe-label">Frontend</div>
             <div class="pipe-status">idle</div>
           </div>
           <div class="pipe-arrow">→</div>
           <div class="pipe-stage" data-agent="backend_agent">
-            <div class="pipe-icon">⚙</div>
+            <div class="pipe-icon">[GEAR]</div>
             <div class="pipe-label">Backend</div>
             <div class="pipe-status">idle</div>
           </div>
           <div class="pipe-arrow">→</div>
           <div class="pipe-stage" data-agent="qa_agent">
-            <div class="pipe-icon">🧪</div>
+            <div class="pipe-icon">[TEST]</div>
             <div class="pipe-label">QA</div>
             <div class="pipe-status">idle</div>
           </div>
           <div class="pipe-arrow">→</div>
           <div class="pipe-stage" data-agent="reviewer_agent">
-            <div class="pipe-icon">✅</div>
+            <div class="pipe-icon">[OK]</div>
             <div class="pipe-label">Review</div>
             <div class="pipe-status">idle</div>
           </div>
@@ -187,13 +187,13 @@
         <div id="company-input-bar">
           <textarea id="company-prompt" placeholder="Describe what to build… e.g. 'Build a Pomodoro timer app'"
             rows="2"></textarea>
-          <button id="company-run-btn">Build ➤</button>
+          <button id="company-run-btn">Build </button>
         </div>
 
         <!-- Live transcript -->
         <div id="company-transcript">
           <div class="company-empty">
-            <div class="welcome-icon">🏢</div>
+            <div class="welcome-icon">[COMPANY]</div>
             <h3>Software Company</h3>
             <p>Describe a project above. Six agents will plan, design, code, test, and review it.</p>
           </div>
@@ -251,7 +251,7 @@
         <input type="text" id="workspace-path-input" placeholder="C:/Users/..." />
         <button id="save-workspace-btn">Save</button>
       </div>
-      <button class="modal-close" id="close-modal">✕</button>
+      <button class="modal-close" id="close-modal"></button>
     </div>
   </div>
 

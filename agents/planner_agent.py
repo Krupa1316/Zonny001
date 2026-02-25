@@ -17,10 +17,10 @@ class PlannerAgent(BaseAgent):
     Planner Agent that uses Ollama LLM to generate execution plans.
     
     Rules:
-    ✔ Produces structure (JSON plans)
-    ✔ Never executes tools
-    ✔ Never reads files
-    ✔ Only decides what to do
+    [OK] Produces structure (JSON plans)
+    [OK] Never executes tools
+    [OK] Never reads files
+    [OK] Only decides what to do
     """
     
     name = "planner"

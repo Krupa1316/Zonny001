@@ -70,15 +70,15 @@ def format_context_for_planner(context: dict) -> str:
         
         if notable_files:
             lines.append("Notable files available:")
-            for nf in notable_files[:5]:  # Top 5
-                lines.append(f"  - {nf}")
+            for nf in notable_files[:5]: # Top 5
+                lines.append(f" - {nf}")
     
     # Recent operations
     if context.get("recent_operations"):
-        recent = context["recent_operations"][-3:]  # Last 3
+        recent = context["recent_operations"][-3:] # Last 3
         lines.append("\nRecent operations:")
         for op in recent:
-            lines.append(f"  - {op}")
+            lines.append(f" - {op}")
     
     # Files read in session
     if context.get("files_read"):
@@ -94,7 +94,7 @@ def loop(project_root: str):
     Args:
         project_root: The directory where Zonny was invoked
     """
-    print("💡 Type /exit to quit, or just start chatting!\n")
+    print("[IDEA] Type /exit to quit, or just start chatting!\n")
     
     # Session context with enhanced awareness
     context = {
@@ -114,9 +114,9 @@ def loop(project_root: str):
         while True:
             # Get user input
             try:
-                user_input = input("➜ Zonny > ").strip()
+                user_input = input(" Zonny > ").strip()
             except EOFError:
-                print("\n👋 Goodbye!")
+                print("\n Goodbye!")
                 break
             
             if not user_input:
@@ -124,7 +124,7 @@ def loop(project_root: str):
             
             # Handle exit commands
             if user_input.lower() in ['/exit', 'exit', 'quit']:
-                print("\n👋 Goodbye!")
+                print("\n Goodbye!")
                 break
             
             # Handle help command
@@ -137,14 +137,14 @@ def loop(project_root: str):
                 result = process_input(user_input, context)
                 print(f"\n{result}\n")
             except KeyboardInterrupt:
-                print("\n⚠️  Interrupted")
+                print("\n[WARN]️ Interrupted")
                 continue
             except Exception as e:
-                print(f"\n❌ Error: {e}\n")
+                print(f"\n[FAIL] Error: {e}\n")
                 continue
     
     except KeyboardInterrupt:
-        print("\n\n👋 Interrupted. Goodbye!")
+        print("\n\n Interrupted. Goodbye!")
         sys.exit(0)
 
 
@@ -171,15 +171,15 @@ def process_input(user_input: str, context: dict) -> str:
             routing = route(user_input, context)
 
             if routing.get("error") == "ollama_offline":
-                return "❌ Ollama is not running. Start it with: ollama serve"
+                return "[FAIL] Ollama is not running. Start it with: ollama serve"
 
             agent_name = routing.get("agent", "general")
             task = routing.get("task", user_input)
             intent = routing.get("intent", "unknown")
             confidence = routing.get("confidence", 0)
 
-            print(f"🧭 Router → agent: {agent_name}  intent: {intent}  confidence: {confidence:.0%}")
-            print(f"📋 Task: {task}")
+            print(f" Router → agent: {agent_name} intent: {intent} confidence: {confidence:.0%}")
+            print(f"[LIST] Task: {task}")
             print()
 
             # Phase 2: Agent executes task via ReAct loop
@@ -208,7 +208,7 @@ def process_input(user_input: str, context: dict) -> str:
                 if not reflection.get("done") and reflection.get("next_action") and \
                    reflection.get("confidence", 1.0) < 0.6:
                     retry_hint = reflection.get("next_action", "")
-                    print(f"\n🔄 Retrying with feedback: {retry_hint}\n")
+                    print(f"\n[REFRESH] Retrying with feedback: {retry_hint}\n")
                     result = run_react_agent(
                         user_query=f"{task}\n\nHint: {retry_hint}",
                         project_root=context.get("project_root", "."),
@@ -216,15 +216,15 @@ def process_input(user_input: str, context: dict) -> str:
                         verbose=False
                     )
                 elif quality in ("excellent", "good") and note:
-                    result += f"\n\n✨ {note}"
+                    result += f"\n\n[DONE] {note}"
 
             except Exception:
-                pass  # Reflection is advisory — never block the result
+                pass # Reflection is advisory — never block the result
 
             return result
 
         except Exception as e:
-            print(f"⚠️  ReAct mode failed: {e} — falling back to classic mode")
+            print(f"[WARN]️ ReAct mode failed: {e} — falling back to classic mode")
             # Fall through to classic mode
     
     # CLASSIC MODE: Planner/Router architecture (Phase 1-5)
@@ -241,7 +241,7 @@ def process_input(user_input: str, context: dict) -> str:
     
     if approach == "planner":
         # PLANNER MODE: Multi-step workflow
-        print(f"🧠 Reasoning: {decision.get('reasoning', 'Multi-step needed')}")
+        print(f"[BRAIN] Reasoning: {decision.get('reasoning', 'Multi-step needed')}")
         
         # Add context formatting
         context["context_summary"] = format_context_for_planner(context)
@@ -250,19 +250,19 @@ def process_input(user_input: str, context: dict) -> str:
         plan_obj = plan(user_input, context)
         
         if not plan_obj or "error" in plan_obj:
-            return f"❌ Planning failed: {plan_obj.get('error', 'Unknown error')}"
+            return f"[FAIL] Planning failed: {plan_obj.get('error', 'Unknown error')}"
         
-        print(f"📋 Plan: {plan_obj['goal']}")
+        print(f"[LIST] Plan: {plan_obj['goal']}")
         
         # Show reasoning if available
         if plan_obj.get("reasoning"):
-            print(f"💡 Strategy: {plan_obj['reasoning']}")
+            print(f"[IDEA] Strategy: {plan_obj['reasoning']}")
         
-        print(f"📝 Steps: {len(plan_obj['steps'])}")
+        print(f"[NOTE] Steps: {len(plan_obj['steps'])}")
         
         # Track operation
         context["recent_operations"].append(f"Planned: {plan_obj['goal']}")
-        context["plan_obj"] = plan_obj  # Pass to reflector
+        context["plan_obj"] = plan_obj # Pass to reflector
         
         # Execute plan
         execution = execute_plan(plan_obj, context, verbose=True)
@@ -275,26 +275,26 @@ def process_input(user_input: str, context: dict) -> str:
         
         # Add reflection feedback
         if not reflection.get("done"):
-            result += f"\n\n⚠️ Note: {reflection.get('reason', 'Task may be incomplete')}"
+            result += f"\n\n[WARN]️ Note: {reflection.get('reason', 'Task may be incomplete')}"
         
         # Show approach quality feedback for learning
         approach_quality = reflection.get("approach_quality", "")
         if approach_quality in ["excellent", "good"]:
             efficiency_note = reflection.get("efficiency_note")
             if efficiency_note:
-                result += f"\n\n✨ Approach: {approach_quality.capitalize()} - {efficiency_note}"
+                result += f"\n\n[DONE] Approach: {approach_quality.capitalize()} - {efficiency_note}"
         elif approach_quality in ["poor", "acceptable"] and reflection.get("efficiency_note"):
-            result += f"\n\n💭 Note: {reflection['efficiency_note']}"
+            result += f"\n\n Note: {reflection['efficiency_note']}"
         
         return result
     else:
         # CLASSIC ROUTER MODE: single-step, no verbose thinking
-        print(f"⚡ {decision.get('reasoning', 'Direct operation')}")
+        print(f" {decision.get('reasoning', 'Direct operation')}")
 
         routing = route(user_input, context)
 
         if routing.get("error") == "ollama_offline":
-            return "❌ Ollama is not running. Start it with: ollama serve"
+            return "[FAIL] Ollama is not running. Start it with: ollama serve"
 
         task = routing.get("task", user_input)
 
@@ -312,12 +312,12 @@ def print_help():
     """Print help information"""
     print("""
 ╔══════════════════════════════════════════════════════════════╗
-║                     ZONNY HELP                               ║
+║ ZONNY HELP ║
 ╚══════════════════════════════════════════════════════════════╝
 
 Commands:
-  /exit, exit, quit    - Exit Zonny
-  /help, help          - Show this help
+  /exit, exit, quit - Exit Zonny
+  /help, help - Show this help
 
 Usage:
   Just type naturally! Zonny understands your intent.
@@ -325,18 +325,18 @@ Usage:
 Examples:
   • "list files"
   • "read server.py"
-  • "tell me what this project is about"  (adaptive reasoning)
+  • "tell me what this project is about" (adaptive reasoning)
   • "analyze workspace and create report"
   • "what's the git status?"
 
 Architecture (Phase 6):
-  🧠 ReAct Mode (Default) - Adaptive reasoning
+  [BRAIN] ReAct Mode (Default) - Adaptive reasoning
      Think → Act → Observe → Repeat
      • No assumptions about files
      • Self-corrects on errors
      • Gemini-level intelligence
      
-  📋 Classic Mode - Plan → Execute → Reflect
+  [LIST] Classic Mode - Plan → Execute → Reflect
      (Set ZONNY_REACT_MODE=false to use)
 
 Working Directory:
@@ -344,6 +344,6 @@ Working Directory:
   Files are read/written relative to that directory.
 
 Current Mode:
-  {'🧠 ReAct Mode (Adaptive)' if USE_REACT_MODE else '📋 Classic Mode'}
+  {'[BRAIN] ReAct Mode (Adaptive)' if USE_REACT_MODE else '[LIST] Classic Mode'}
 
 """)

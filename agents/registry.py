@@ -32,7 +32,7 @@ def register(agent):
         raise ValueError("Agent must have 'name' attribute")
     
     AGENTS[agent.name] = agent
-    print(f"🔌 Registered agent: {agent.name}")
+    print(f"[PLUG] Registered agent: {agent.name}")
 
 
 def get(name: str):

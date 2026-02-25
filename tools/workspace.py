@@ -78,7 +78,7 @@ def get_file_tree(directory: str = ".", max_depth: int = 2, root: str = None) ->
     try:
         path.relative_to(workspace)
     except ValueError:
-        return "❌ Access denied: Outside workspace"
+        return "[FAIL] Access denied: Outside workspace"
     
     tree_lines = []
     
@@ -98,19 +98,19 @@ def get_file_tree(directory: str = ".", max_depth: int = 2, root: str = None) ->
                 current_prefix = "└── " if is_last else "├── "
                 
                 if item.is_dir():
-                    tree_lines.append(f"{prefix}{current_prefix}📁 {item.name}/")
-                    next_prefix = prefix + ("    " if is_last else "│   ")
+                    tree_lines.append(f"{prefix}{current_prefix}[DIR] {item.name}/")
+                    next_prefix = prefix + (" " if is_last else "│ ")
                     add_items(item, next_prefix, depth + 1)
                 else:
-                    tree_lines.append(f"{prefix}{current_prefix}📄 {item.name}")
+                    tree_lines.append(f"{prefix}{current_prefix}[DOC] {item.name}")
                     
-                if len(tree_lines) > 100:  # Limit output
+                if len(tree_lines) > 100: # Limit output
                     break
                     
         except PermissionError:
-            tree_lines.append(f"{prefix}❌ Permission denied")
+            tree_lines.append(f"{prefix}[FAIL] Permission denied")
     
-    tree_lines.append(f"📁 ./ (workspace root)")
+    tree_lines.append(f"[DIR] ./ (workspace root)")
     add_items(path)
     
     return "\n".join(tree_lines)
@@ -184,7 +184,7 @@ def get_workspace_summary() -> str:
     workspace_info = scan_workspace()
     git_info = git_status()
     
-    summary = f"""📁 Workspace Summary
+    summary = f"""[DIR] Workspace Summary
 {"="*50}
 
 Location: {workspace_info.get('workspace', 'unknown')}

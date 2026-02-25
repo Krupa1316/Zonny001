@@ -3,7 +3,7 @@ Slice D - Shell Tools
 
 Tools for shell command execution.
 
-⚠️ SECURITY WARNING:
+[WARN]️ SECURITY WARNING:
 - Limited command whitelist
 - No sudo/rm/destructive commands
 - Output truncated
@@ -85,16 +85,16 @@ def run_shell(command: str, timeout: int = 10) -> str:
         output = result.stdout + result.stderr
         
         # Security: Truncate output
-        max_output = 10 * 1024  # 10KB
+        max_output = 10 * 1024 # 10KB
         if len(output) > max_output:
-            output = output[:max_output] + "\n\n⚠️ Output truncated (max 10KB)"
+            output = output[:max_output] + "\n\n[WARN]️ Output truncated (max 10KB)"
         
         if result.returncode != 0:
-            return f"❌ Command failed (exit code {result.returncode}):\n{output}"
+            return f"[FAIL] Command failed (exit code {result.returncode}):\n{output}"
         
-        return output if output else "✅ Command completed (no output)"
+        return output if output else "[OK] Command completed (no output)"
         
     except subprocess.TimeoutExpired:
         raise TimeoutError(f"Command timed out after {timeout}s")
     except Exception as e:
-        return f"❌ Error executing command: {e}"
+        return f"[FAIL] Error executing command: {e}"

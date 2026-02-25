@@ -21,9 +21,9 @@ sys.path.insert(0, ROOT)
 OLLAMA_URL = "http://localhost:11434"
 MODEL = "nemotron-3-nano:latest"
 
-PASS = "✅"
-FAIL = "❌"
-WARN = "⚠️ "
+PASS = "[OK]"
+FAIL = "[FAIL]"
+WARN = "[WARN]️ "
 
 results = {}
 
@@ -31,16 +31,16 @@ results = {}
 def check(name: str, ok: bool, detail: str = ""):
     results[name] = ok
     icon = PASS if ok else FAIL
-    line = f"  {icon}  {name}"
+    line = f" {icon} {name}"
     if detail:
-        line += f"  →  {detail}"
+        line += f" → {detail}"
     print(line)
     return ok
 
 
 def section(title: str):
     print(f"\n{'─' * 60}")
-    print(f"  {title}")
+    print(f" {title}")
     print(f"{'─' * 60}")
 
 
@@ -258,7 +258,7 @@ try:
         {"tool": "filesystem.list", "args": {"path": "."}},
         {"project_root": ROOT}
     )
-    check("Dispatcher executes filesystem.list", not result.startswith("❌"), result[:80])
+    check("Dispatcher executes filesystem.list", not result.startswith("[FAIL]"), result[:80])
 except Exception as e:
     check("Dispatcher execution", False, str(e))
 
@@ -270,22 +270,22 @@ passed = sum(1 for v in results.values() if v)
 failed = total - passed
 pct = int(passed / total * 100) if total else 0
 
-print(f"\n  {PASS} Passed  : {passed}/{total}")
-print(f"  {FAIL} Failed  : {failed}/{total}")
-print(f"  Score    : {pct}%\n")
+print(f"\n {PASS} Passed : {passed}/{total}")
+print(f" {FAIL} Failed : {failed}/{total}")
+print(f" Score : {pct}%\n")
 
 if failed:
-    print("  Failed checks:")
+    print(" Failed checks:")
     for k, v in results.items():
         if not v:
-            print(f"    {FAIL}  {k}")
+            print(f" {FAIL} {k}")
     print()
 
 if pct == 100:
-    print("  🎉 All systems nominal. Zonny is ready.\n")
+    print(" [DONE] All systems nominal. Zonny is ready.\n")
 elif pct >= 75:
-    print("  🟡 Core working. Fix failing checks before production.\n")
+    print(" [WARN] Core working. Fix failing checks before production.\n")
 else:
-    print("  🔴 Critical failures detected. Fix before using.\n")
+    print(" [ERROR] Critical failures detected. Fix before using.\n")
 
 sys.exit(0 if failed == 0 else 1)

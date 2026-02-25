@@ -1,5 +1,5 @@
 """
-🚀 Execution Engine
+[START] Execution Engine
 
 The heart of the runtime.
 
@@ -26,9 +26,9 @@ class ExecutionEngine:
     Core execution loop.
     
     Engine NEVER:
-    ❌ talks to Ollama
-    ❌ accesses filesystem
-    ❌ queries Chroma
+    [FAIL] talks to Ollama
+    [FAIL] accesses filesystem
+    [FAIL] queries Chroma
     
     Only agents do that.
     Engine orchestrates only.
@@ -68,19 +68,19 @@ class ExecutionEngine:
         context = AgentContext(user_input)
         
         if verbose:
-            print(f"\n🎯 Run ID: {context.run_id}")
-            print(f"📝 Input: {user_input}\n")
+            print(f"\n[TARGET] Run ID: {context.run_id}")
+            print(f"[NOTE] Input: {user_input}\n")
         
         try:
             # Step 2: Ask planner what to do
             if verbose:
-                print("🧠 Asking planner...")
+                print("[BRAIN] Asking planner...")
             
             plan = self.planner.execute(context, user_input)
             context.plan = plan
             
             if verbose:
-                print(f"📋 Plan created: {len(plan)} steps\n")
+                print(f"[LIST] Plan created: {len(plan)} steps\n")
             
             # Step 3: Execute each step
             for i, step in enumerate(plan):
@@ -95,11 +95,11 @@ class ExecutionEngine:
                     if not self.registry.is_agent_enabled(subagent_name):
                         error_msg = f"Agent '{subagent_name}' is disabled"
                         if verbose:
-                            print(f"⚙️  Step {i+1}/{len(plan)}: ⛔ {error_msg}")
+                            print(f"[GEAR]️ Step {i+1}/{len(plan)}: [STOP] {error_msg}")
                         raise Exception(error_msg)
                     
                     if verbose:
-                        print(f"⚙️  Step {i+1}/{len(plan)}: 🤖 SubAgent '{subagent_name}'")
+                        print(f"[GEAR]️ Step {i+1}/{len(plan)}: [BOT] SubAgent '{subagent_name}'")
                     
                     # Get manifest
                     manifest = self.registry.get_manifest(subagent_name)
@@ -114,14 +114,14 @@ class ExecutionEngine:
                     context.add_tool_output(subagent_name, result)
                     
                     if verbose:
-                        print(f"   ✅ SubAgent completed\n")
+                        print(f" [OK] SubAgent completed\n")
                 
                 elif "agent" in step:
                     # Regular agent (Phase 1 style)
                     agent_name = step.get("agent")
                     
                     if verbose:
-                        print(f"⚙️  Step {i+1}/{len(plan)}: {agent_name}")
+                        print(f"[GEAR]️ Step {i+1}/{len(plan)}: {agent_name}")
                     
                     # Get agent from registry
                     agent = self.registry.get_agent(agent_name)
@@ -133,7 +133,7 @@ class ExecutionEngine:
                     context.add_tool_output(agent_name, result)
                     
                     if verbose:
-                        print(f"   ✅ Result: {str(result)[:100]}...\n")
+                        print(f" [OK] Result: {str(result)[:100]}...\n")
                 
                 else:
                     raise Exception(f"Step {i} must have 'agent' or 'subagent' key")
@@ -145,12 +145,12 @@ class ExecutionEngine:
                 context.mark_complete(context.tool_outputs)
             
             if verbose:
-                print("✅ Execution complete!\n")
+                print("[OK] Execution complete!\n")
             
         except Exception as e:
             context.add_error(e)
             if verbose:
-                print(f"❌ Error: {e}\n")
+                print(f"[FAIL] Error: {e}\n")
             raise
         
         return context

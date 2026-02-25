@@ -44,7 +44,7 @@ class DocsAgent(Agent):
         
         # Slice E: Call Ollama with document context
         if not doc_memories:
-            response = "📭 No documents uploaded yet. Upload PDFs using /v1/upload endpoint to query them."
+            response = " No documents uploaded yet. Upload PDFs using /v1/upload endpoint to query them."
         else:
             # Build document context for LLM
             doc_context = "\n\nRelevant document content:\n"
@@ -73,9 +73,9 @@ If the answer isn't in the documents, say so.{doc_context}"""
                     result = llm_response.json()
                     response = result.get("response", "No response from LLM")
                 else:
-                    response = f"❌ LLM error: {llm_response.status_code}"
+                    response = f"[FAIL] LLM error: {llm_response.status_code}"
             except Exception as e:
-                response = f"❌ Error: {e}"
+                response = f"[FAIL] Error: {e}"
         
         # Store assistant response
         store(response, session, self.name, "assistant")

@@ -47,7 +47,7 @@ class MemoryAgent(Agent):
         
         # Slice E: Call Ollama with cross-agent context
         if not cross_memories:
-            response = "📭 No conversation history found in this session yet."
+            response = " No conversation history found in this session yet."
         else:
             # Build cross-agent context for LLM
             memory_context = "\n\nConversation history across agents:\n"
@@ -76,9 +76,9 @@ Summarize, recall, or answer questions about past interactions.{memory_context}"
                     result = llm_response.json()
                     response = result.get("response", "No response from LLM")
                 else:
-                    response = f"❌ LLM error: {llm_response.status_code}"
+                    response = f"[FAIL] LLM error: {llm_response.status_code}"
             except Exception as e:
-                response = f"❌ Error: {e}"
+                response = f"[FAIL] Error: {e}"
         
         # Store assistant response
         store(response, session, self.name, "assistant")

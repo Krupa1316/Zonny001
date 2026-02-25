@@ -3,7 +3,7 @@ ReAct Loop - The Heart of Zonny
 
 This is the fundamental loop that powers all modern AI agents:
 - Gemini CLI
-- Claude Code  
+- Claude Code 
 - OpenAI Agents
 
 Architecture:
@@ -58,7 +58,7 @@ class ReActLoop:
         
         if self.verbose:
             print(f"{'─'*70}")
-            print(f"✦ Starting exploration...")
+            print(f" Starting exploration...")
             print(f"{'─'*70}\n")
         
         # Main loop - this is Zonny's cognition
@@ -71,7 +71,7 @@ class ReActLoop:
                 decision = self.planner.decide(world)
             except Exception as e:
                 if self.verbose:
-                    print(f"❌ Planner error: {e}")
+                    print(f"[FAIL] Planner error: {e}")
                 world.update(
                     observation=f"Planner failed: {str(e)}",
                     error=str(e)
@@ -81,13 +81,13 @@ class ReActLoop:
             
             # Display thinking (like Gemini format)
             if self.verbose:
-                print(f"✦ {decision.thought}")
+                print(f" {decision.thought}")
             
             # CHECK: Are we done?
             if decision.done:
                 if self.verbose:
                     print(f"\n{'─'*70}")
-                    print(f"✦ Analysis complete after {iteration} iterations")
+                    print(f" Analysis complete after {iteration} iterations")
                     print(f"{'─'*70}\n")
                 
                 return decision.final_answer or "Task completed but no answer provided."
@@ -96,7 +96,7 @@ class ReActLoop:
             if self.verbose:
                 action_display = decision.action.replace("filesystem.", "").replace("workspace.", "")
                 args_display = decision.args.get('path', '') if 'path' in decision.args else str(decision.args)
-                print(f"  ✓ {action_display.title()} {args_display}")
+                print(f" {action_display.title()} {args_display}")
             
             try:
                 result = self.executor.run_single(decision.action, decision.args)
@@ -113,9 +113,9 @@ class ReActLoop:
                     file_path = decision.args.get('path', 'unknown')
                     if 'file_contents' not in world.knowledge:
                         world.knowledge['file_contents'] = {}
-                    # Strip the dispatcher prefix ("📄 Contents of path:\n\n") before storing
+                    # Strip the dispatcher prefix ("[DOC] Contents of path:\n\n") before storing
                     raw = result
-                    if result.startswith("📄 Contents of"):
+                    if result.startswith("[DOC] Contents of"):
                         sep = result.find("\n\n")
                         if sep != -1:
                             raw = result[sep + 2:]
@@ -137,15 +137,15 @@ class ReActLoop:
                 if self.verbose:
                     if isinstance(result, str) and len(result) > 100:
                         line_count = result.count('\n') + 1
-                        print(f"     → Read {len(result)} chars ({line_count} lines)")
+                        print(f" → Read {len(result)} chars ({line_count} lines)")
                     elif isinstance(result, list):
-                        print(f"     → Found {len(result)} items")
-                    print()  # Blank line for readability
+                        print(f" → Found {len(result)} items")
+                    print() # Blank line for readability
                 
             except Exception as e:
                 error_msg = f"Action '{decision.action}' failed: {str(e)}"
                 if self.verbose:
-                    print(f"  \u274c {error_msg}\n")
+                    print(f" \u274c {error_msg}\n")
                 
                 world.update(
                     observation=error_msg,
@@ -158,7 +158,7 @@ class ReActLoop:
         # Safety: Hit max iterations
         if self.verbose:
             print(f"\n{'─'*70}")
-            print(f"⚠️  Reached maximum iterations ({self.max_iterations})")
+            print(f"[WARN]️ Reached maximum iterations ({self.max_iterations})")
             print(f"{'─'*70}\n")
         
         return self._create_timeout_response(world)
@@ -185,8 +185,8 @@ class ReActLoop:
             # ── File reads: return actual file content (strip dispatcher prefix) ──
             if action == "filesystem.read":
                 content = result
-                # Strip the "📄 Contents of path:\n\n" prefix added by dispatcher
-                if result.startswith("📄 Contents of"):
+                # Strip the "[DOC] Contents of path:\n\n" prefix added by dispatcher
+                if result.startswith("[DOC] Contents of"):
                     sep = result.find("\n\n")
                     if sep != -1:
                         content = result[sep + 2:]

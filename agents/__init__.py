@@ -15,7 +15,7 @@ Phase 2 (legacy):
 from .registry import register
 
 # Initialize silently (avoid emoji encoding issues on Windows)
-# print("\n🚀 Initializing Slice B Agent System...")
+# print("\n[START] Initializing Slice B Agent System...")
 
 # Import ALL agents (no optional imports)
 from .router import RouterAgent
@@ -31,16 +31,16 @@ register(DocsAgent())
 register(CodeAgent())
 register(MemoryAgent())
 
-# print("✅ Slice B Agent System Ready\n")
+# print("[OK] Slice B Agent System Ready\n")
 
 # Phase 2 (legacy)
 from .planner_agent import PlannerAgent
 
 __all__ = [
-    'PlannerAgent',  # Phase 2
-    'RouterAgent',   # Slice B
-    'GeneralAgent',  # Slice B
-    'DocsAgent',     # Slice B
-    'CodeAgent',     # Slice B
-    'MemoryAgent',   # Slice B
+    'PlannerAgent', # Phase 2
+    'RouterAgent', # Slice B
+    'GeneralAgent', # Slice B
+    'DocsAgent', # Slice B
+    'CodeAgent', # Slice B
+    'MemoryAgent', # Slice B
 ]

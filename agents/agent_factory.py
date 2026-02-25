@@ -124,7 +124,7 @@ class AgentFactory:
         
         # Check if enabled
         if not manifest.enabled:
-            print(f"⚠️  Agent '{agent_name}' is disabled in manifest")
+            print(f"[WARN]️ Agent '{agent_name}' is disabled in manifest")
             return None
         
         # Create agent

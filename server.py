@@ -2,18 +2,18 @@
 Zonny v0.3.0 — FastAPI Server
 
 Two modes exposed at POST /mcp:
-  - Simple:  semantic router → dispatcher  (fast)
-  - Complex: AutoGen team   → SSE stream   (powerful, multi-model)
+  - Simple: semantic router → dispatcher (fast)
+  - Complex: AutoGen team → SSE stream (powerful, multi-model)
 
 New endpoints added in v0.3:
-  GET  /               → Web Chat UI (frontend/index.html)
-  GET  /stream         → SSE stream of agent events (AutoGen)
-  GET  /agents/status  → Real-time agent roster for UI sidebar
+  GET / → Web Chat UI (frontend/index.html)
+  GET /stream → SSE stream of agent events (AutoGen)
+  GET /agents/status → Real-time agent roster for UI sidebar
 
 Legacy endpoints preserved:
   POST /v1/chat/completions
   POST /v1/upload
-  GET/POST /agents/*   (enable, disable, refresh, details)
+  GET/POST /agents/* (enable, disable, refresh, details)
 """
 
 import asyncio
@@ -126,7 +126,7 @@ async def stream_agent_activity(
     Used by the Web UI's live agent activity panel.
 
     Query params:
-        task:    The user's message/task
+        task: The user's message/task
         session: Session ID for memory scoping
     """
     async def event_generator():
@@ -134,7 +134,7 @@ async def stream_agent_activity(
             async for event in stream_team(task=task, session_id=session):
                 data = json.dumps(event)
                 yield f"data: {data}\n\n"
-                await asyncio.sleep(0)  # Allow event loop to breathe
+                await asyncio.sleep(0) # Allow event loop to breathe
         except Exception as e:
             error_event = json.dumps({
                 "agent": "system",
@@ -181,7 +181,7 @@ async def mcp_gateway(req: MCPRequest, _: str = Depends(verify_api_key)):
 
     All prompts route through the 2-agent AutoGen team:
       Specialist → analyses task
-      Assistant  → synthesises final answer + TERMINATE
+      Assistant → synthesises final answer + TERMINATE
     """
     if not req.input and not req.command:
         raise HTTPException(status_code=400, detail="Must provide input or command")
@@ -197,7 +197,7 @@ async def mcp_gateway(req: MCPRequest, _: str = Depends(verify_api_key)):
             if resp:
                 return {"response": resp.get("response", ""), "mode": "command"}
         except Exception:
-            pass  # Fall through to AutoGen if command handler missing
+            pass # Fall through to AutoGen if command handler missing
 
     try:
         result = await run_team(task=user_input, session_id=req.session)
@@ -433,11 +433,11 @@ async def file_tree(
     try:
         for item in sorted(root.iterdir(), key=lambda x: (x.is_file(), x.name.lower())):
             entries.append({
-                "name":   item.name,
-                "path":   str(item).replace("\\", "/"),
-                "type":   "file" if item.is_file() else "directory",
-                "size":   item.stat().st_size if item.is_file() else None,
-                "ext":    item.suffix.lstrip(".") if item.is_file() else None,
+                "name": item.name,
+                "path": str(item).replace("\\", "/"),
+                "type": "file" if item.is_file() else "directory",
+                "size": item.stat().st_size if item.is_file() else None,
+                "ext": item.suffix.lstrip(".") if item.is_file() else None,
             })
     except PermissionError:
         pass
@@ -505,7 +505,7 @@ async def terminal_ws(ws: WebSocket, api_key: str = ""):
 @app.post("/v1/chat/completions")
 def chat(req: ChatRequest, _: str = Depends(verify_api_key)):
     """
-    🧠 Orchestrator-based chat endpoint (legacy, preserved)
+    [BRAIN] Orchestrator-based chat endpoint (legacy, preserved)
 
     Flow:
     1. Orchestrator decides which agents to use

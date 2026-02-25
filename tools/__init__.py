@@ -17,7 +17,7 @@ from .fs import read_file, write_file, list_files, search_files, get_cwd
 from .shell import run_shell
 
 # Initialize silently (avoid emoji encoding issues on Windows)
-# print("\n🔧 Initializing Slice D Tool System...")
+# print("\n[FIX] Initializing Slice D Tool System...")
 
 # Register filesystem tools
 register("read_file", read_file)
@@ -29,7 +29,7 @@ register("get_cwd", get_cwd)
 # Register shell tools
 register("run_shell", run_shell)
 
-# print("✅ Slice D Tool System Ready\n")
+# print("[OK] Slice D Tool System Ready\n")
 
 # Phase 3 (legacy) - Import all legacy tools
 from .vector_tool import VectorTool
