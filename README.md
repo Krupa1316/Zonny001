@@ -1,475 +1,478 @@
-```
-╔══════════════════════════════════════════════════════════════════════╗
-║                                                                      ║
-║   ███████╗ ██████╗ ███╗   ██╗███╗   ██╗██╗   ██╗                     ║
-║   ╚══███╔╝██╔═══██╗████╗  ██║████╗  ██║╚██╗ ██╔╝                     ║
-║     ███╔╝ ██║   ██║██╔██╗ ██║██╔██╗ ██║ ╚████╔╝                      ║
-║    ███╔╝  ██║   ██║██║╚██╗██║██║╚██╗██║  ╚██╔╝                       ║
-║   ███████╗╚██████╔╝██║ ╚████║██║ ╚████║   ██║                        ║
-║   ╚══════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝   ╚═╝                        ║
-║                                                                      ║
-║                    Welcome to the zone                               ║
-╚══════════════════════════════════════════════════════════════════════╝
-```
+# Zonny -- Local AI Development Platform
 
-# Zonny — Local AI Agent Runtime
+Zonny is an AI-powered development platform that runs entirely on your local machine. It uses locally-hosted language models to provide a multi-agent coding environment with a web-based IDE, a software company simulator that builds applications from natural language prompts, and an automatic error detection and repair system.
 
-Zonny is a fully **local, privacy-first AI agent runtime** that runs powerful coding and reasoning agents entirely on your own machine. No cloud. No subscription. No data leaving your system.
-
-Built on top of [Ollama](https://ollama.com), Zonny implements the same **ReAct (Reason + Act)** loop architecture found in Gemini CLI and Claude Code — semantic routing, secure dispatching, reflection, vector memory, MCP protocol support, and a REST API — all running locally.
+Everything runs on your hardware. No cloud APIs, no subscriptions, no data leaving your machine.
 
 ---
 
 ## Table of Contents
 
-- [Why Zonny?](#why-zonny)
-- [Architecture Overview](#architecture-overview)
-- [Features](#features)
-- [Project Structure](#project-structure)
-- [Prerequisites](#prerequisites)
+- [What is Zonny?](#what-is-zonny)
+- [Key Concepts for Beginners](#key-concepts-for-beginners)
+- [System Requirements](#system-requirements)
 - [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
+- [Starting the Server](#starting-the-server)
+- [Using the Web Interface](#using-the-web-interface)
+- [Using the CLI](#using-the-cli)
+- [Agent Architecture](#agent-architecture)
 - [REST API Reference](#rest-api-reference)
 - [MCP Integration](#mcp-integration)
 - [Permission Modes](#permission-modes)
-- [Agent Manifests](#agent-manifests)
-- [Tool Registry](#tool-registry)
-- [Memory System](#memory-system)
+- [Configuration](#configuration)
+- [Project Structure](#project-structure)
 - [Diagnostics](#diagnostics)
-- [Roadmap](#roadmap)
 - [Contributing](#contributing)
+- [Tech Stack](#tech-stack)
 - [License](#license)
 
 ---
 
-## Why Zonny?
+## What is Zonny?
 
-Most AI coding agents require cloud connectivity and send your code to external servers. Zonny takes a different approach:
+Zonny is a platform where AI agents collaborate to help you write software. When you type a prompt like "Build a Pomodoro timer app," six specialised AI agents work together -- a CEO writes the requirements, an architect designs the system, frontend and backend engineers write the code, a QA engineer tests it, and a reviewer signs off. The generated application is immediately previewed in your browser, and if it has errors, the agents automatically detect and fix them.
 
-| Feature | Zonny | Cloud Agents |
-|---------|-------|-------------|
-| Runs locally | ✅ | ❌ |
-| Your data stays local | ✅ | ❌ |
-| Works offline | ✅ | ❌ |
-| MCP protocol | ✅ | Some |
-| ReAct loop | ✅ | Some |
-| Vector memory | ✅ | Some |
-| Free to run | ✅ | Often paid |
+Zonny also provides:
+
+- A full web-based code editor (powered by the same engine as VS Code)
+- An integrated terminal for running commands
+- A multi-agent chat system for asking questions about code, documents, or general topics
+- Persistent memory so the AI remembers your previous conversations
 
 ---
 
-## Architecture Overview
+## Key Concepts for Beginners
 
-Zonny is built in layers. Each layer has a single, well-defined responsibility.
+If you are new to AI engineering, here are the core ideas behind Zonny:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      User Interface                         │
-│         Terminal CLI (zonny)  ·  Web UI (chat)              │
-└──────────────────────┬──────────────────────────────────────┘
-                       │  HTTP / Zonny Protocol v1
-┌──────────────────────▼──────────────────────────────────────┐
-│                   MCP Gateway  (server.py)                  │
-│         FastAPI · Auth · Session Management · MCP           │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│               Semantic Router  (zonny/semantic_router.py)   │
-│    Routes intent → selects Agent + Task (no tool names)     │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│               ReAct Loop  (zonny/react_loop.py)             │
-│  Think → Act → Observe → Think → Act → Observe → Answer    │
-│                   (up to 50 iterations)                     │
-└──────────┬───────────────────────────┬──────────────────────┘
-           │                           │
-┌──────────▼──────────┐    ┌───────────▼───────────────────── ┐
-│   Planner           │    │   Dispatcher  (dispatcher.py)    │
-│   (planner.py)      │    │   The ONLY component that        │
-│   Decides ONE       │    │   touches the OS/filesystem.     │
-│   action at a time  │    │   Path-safe, permission-gated.   │
-└──────────┬──────────┘    └───────────┬────────────────────── ┘
-           │                           │
-┌──────────▼──────────────────────────▼──────────────────────┐
-│                     Tool Registry                           │
-│   filesystem · workspace · code · shell · memory · git     │
-└─────────────────────────────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│             Memory Layer  (zonny/memory.py)                 │
-│        ChromaDB Vector Store · SentenceTransformers         │
-└─────────────────────────────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│               Ollama  (local LLM)                           │
-│            nemotron-3-nano:latest  (default)                │
-└─────────────────────────────────────────────────────────────┘
-```
+### What is a Language Model (LLM)?
 
-### Core Loop — ReAct
+A language model is a type of AI that can read and generate text. It can understand instructions, answer questions, write code, and have conversations. Examples include GPT, Claude, and Gemini. Zonny uses **Ollama** to run these models directly on your computer instead of sending requests to the cloud.
 
-Unlike static plan-then-execute systems, Zonny uses a reactive loop:
+### What is Ollama?
 
-```
-Query
-  └─► Think   (planner decides a single action)
-        └─► Act      (dispatcher executes it securely)
-              └─► Observe  (result fed back into world state)
-                    └─► Think   (loop continues...)
-                          └─► Answer  (done=true → return)
-```
+Ollama is a free, open-source tool that downloads and runs language models on your local machine. Think of it as a local server for AI models. Zonny sends prompts to Ollama and receives responses -- all without an internet connection.
 
-No assumptions. No static plans. Each step is decided using the full current context.
+### What is an AI Agent?
+
+An AI agent is a program that uses a language model to take actions, not just generate text. For example, instead of just saying "you should create a file called main.py," an agent actually creates the file. Zonny has multiple agents, each specialised for different tasks.
+
+### What is a Multi-Agent System?
+
+Instead of one AI doing everything, Zonny uses teams of agents that pass work between each other. The "Software Company" mode uses six agents in a pipeline, while the "Chat" mode uses a router agent that picks the best specialist for your question.
+
+### What is ReAct?
+
+ReAct (Reason + Act) is a pattern where the AI thinks about what to do, takes an action, observes the result, and then thinks again. This loop continues until the task is complete. It is more reliable than a single-shot "generate all the code at once" approach.
 
 ---
 
-## Features
+## System Requirements
 
-- **ReAct Loop** — Adaptive reasoning: Think → Act → Observe until the answer is ready
-- **Semantic Router** — Understands intent and routes to the correct agent without exposing tool names
-- **Secure Dispatcher** — The one component that touches the OS; enforces path safety and permission modes
-- **Reflection Loop** — Evaluates answer confidence; retries on low-quality responses
-- **Tool Registry** — Single source of truth for all available tools with capability metadata
-- **Agent Manifests** — Agents defined in YAML; easy to add new agents without changing code
-- **Vector Memory** — ChromaDB + SentenceTransformers for semantic retrieval across sessions
-- **FastAPI Server** — REST API with API key auth, PDF ingestion, chat endpoint
-- **MCP Server** — stdio MCP server for Claude Desktop integration
-- **Permission Modes** — `safe` (read-only), `dev` (read+write), `full` (all ops)
-- **PDF Document Ingestion** — Upload PDFs and query them with your agent
-- **Multi-session Support** — Sessions are isolated with per-session context
-- **Workspace Awareness** — Scans project structure, generates reports, tracks file trees
+| Requirement | Minimum | Recommended |
+|------------|---------|-------------|
+| Operating System | Windows 10, macOS 12, Ubuntu 20.04 | Windows 11, macOS 14, Ubuntu 22.04 |
+| Python | 3.10 or higher | 3.12 |
+| RAM | 8 GB | 16 GB or more |
+| Disk Space | 10 GB (for models) | 40 GB (for larger coding models) |
+| GPU | Not required | NVIDIA GPU with 8+ GB VRAM speeds up inference |
 
----
+### Required Software
 
-## Project Structure
-
-```
-zonny/                          # Core agent runtime package
-│
-├── cli.py                      # Interactive terminal UI (entry point: zonny)
-├── react_loop.py               # The ReAct Think→Act→Observe engine
-├── planner.py                  # Decision engine: makes ONE decision per step
-├── executor.py                 # Executes the chosen action
-├── dispatcher.py               # Secure OS interface (path safety, permissions)
-├── router.py                   # Task-level routing within an agent
-├── semantic_router.py          # High-level intent → agent+task routing
-├── reflector.py                # Evaluates answer quality, triggers retries
-├── world.py                    # Immutable world state passed through the loop
-├── tool_registry.py            # Central registry of all tools + capabilities
-├── memory.py                   # ChromaDB vector store interface
-├── runtime.py                  # Runtime configuration and globals
-├── agent.py                    # Base agent definition
-├── server_entry.py             # Entry point for zonny-server command
-├── mcp_entry.py                # Entry point for zonny-mcp command
-└── __init__.py
-│
-agents/                         # Agent definitions
-├── manifests/                  # YAML agent manifests
-│   ├── assistant.yaml          #   General-purpose assistant agent
-│   ├── codebase.yaml           #   Codebase analysis & editing agent
-│   ├── document.yaml           #   PDF document Q&A agent
-│   ├── generalist.yaml         #   Generalist fallback agent
-│   └── memory.yaml             #   Memory management agent
-├── base.py                     # Base agent class
-├── code.py                     # Code-specific agent logic
-├── docs.py                     # Document agent logic
-├── general.py                  # General agent logic
-├── memory.py                   # Memory agent logic
-├── planner_agent.py            # Planning subagent
-├── agent_factory.py            # Creates agent instances from manifests
-├── manifest_loader.py          # Loads & validates YAML manifests
-├── registry.py                 # Agent registry
-├── router.py                   # Agent-level router
-└── __init__.py
-│
-tools/                          # Tool implementations
-├── fs.py                       # Filesystem: read, write, list, search files
-├── workspace.py                # Workspace: scan, tree, git status
-├── analyzer.py                 # Code analysis & report generation
-├── shell.py                    # Shell command execution (full mode only)
-├── memory_tool.py              # Memory query/store tool
-├── vector_tool.py              # Vector search tool
-├── file_tool.py                # Extended file operations
-├── runner.py                   # Command runner
-├── registry.py                 # Tool registry implementation
-└── __init__.py
-│
-commands/                       # CLI command handlers
-├── system.py                   # System commands (/help, /agents, etc.)
-└── __init__.py
-│
-runtime/                        # Runtime utilities
-├── base.py                     # Base runtime classes
-├── context.py                  # Context management
-├── engine.py                   # Runtime engine
-├── registry.py                 # Runtime registry
-├── subagent.py                 # Subagent spawning
-└── __init__.py
-│
-server.py                       # FastAPI REST server (MCP Gateway)
-mcp_server.py                   # MCP stdio server (Claude Desktop)
-orchestrator.py                 # RAG + memory orchestration layer
-memory.py                       # Root-level memory (used by orchestrator)
-zonny.py                        # CLI shim (calls zonny.cli:main)
-create_key.py                   # API key generator utility
-zonny_status.py                 # Full diagnostic test suite (35 tests)
-setup.py                        # Package setup (pip install -e .)
-requirements.txt                # Python dependencies
-```
-
----
-
-## Prerequisites
-
-Before installing Zonny, make sure you have:
-
-### 1. Python 3.10+
-```bash
-python --version   # should be 3.10 or higher
-```
-
-### 2. Ollama (required — runs the LLM locally)
-
-Download from [https://ollama.com](https://ollama.com), then pull the default model:
-
-```bash
-ollama pull nemotron-3-nano:latest
-```
-
-Zonny works with any Ollama model. The model can be changed in `zonny/runtime.py` and `orchestrator.py`.
-
-### 3. Git (optional, for git tools)
-```bash
-git --version
-```
+1. **Python 3.10+** -- Download from [python.org](https://www.python.org/downloads/)
+2. **Ollama** -- Download from [ollama.com](https://ollama.com)
+3. **Git** (optional) -- Download from [git-scm.com](https://git-scm.com)
 
 ---
 
 ## Installation
 
-### Quick Install (Global — Recommended)
+Follow these steps in order. Each step must complete successfully before moving to the next.
+
+### Step 1: Install Ollama and Download Models
+
+After installing Ollama from [ollama.com](https://ollama.com), open a terminal and run:
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/your-username/zonny.git
-cd zonny
+# Download the default planning/reasoning model (small, fast)
+ollama pull nemotron-3-nano:latest
 
-# 2. Install in editable mode — makes zonny, zonny-server, zonny-mcp available everywhere
+# Download the coding model (large, powerful -- used by the Software Company)
+ollama pull deepseek-coder:33b
+```
+
+The first model is about 2 GB. The second is about 19 GB. Both are downloaded once and cached locally.
+
+To verify Ollama is working:
+
+```bash
+ollama list
+```
+
+You should see both models listed.
+
+### Step 2: Clone the Repository
+
+```bash
+git clone https://github.com/Krupa1316/Zonny001.git
+cd Zonny001
+```
+
+Or download and extract the ZIP file from the repository page.
+
+### Step 3: Create a Virtual Environment
+
+A virtual environment keeps Zonny's dependencies separate from your system Python.
+
+**Windows (PowerShell):**
+```powershell
+python -m venv venv
+venv\Scripts\activate
+```
+
+**macOS / Linux:**
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+You should see `(venv)` at the start of your terminal prompt after activation.
+
+### Step 4: Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+This installs FastAPI, ChromaDB, sentence-transformers, and other required packages. It may take a few minutes on the first run.
+
+### Step 5: Install Zonny as a Package (Optional)
+
+This step makes the `zonny`, `zonny-server`, and `zonny-mcp` commands available system-wide:
+
+```bash
 pip install -e .
 ```
 
-After installation, three commands are available system-wide:
+### Step 6: Generate an API Key
 
-| Command | Description |
-|---------|-------------|
-| `zonny` | Launch the interactive CLI |
-| `zonny-server` | Start the FastAPI REST server on port 8000 |
-| `zonny-mcp` | Start the MCP stdio server |
-
-### Development Install (Virtual Environment)
-
-```bash
-# Create and activate virtual environment
-python -m venv venv
-venv\Scripts\activate        # Windows
-# source venv/bin/activate   # macOS/Linux
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run directly
-python zonny.py
-```
-
----
-
-## Configuration
-
-### API Key
-
-Generate an API key for the REST server:
+The server requires an API key for authentication:
 
 ```bash
 python create_key.py
 ```
 
-This creates (or appends to) `key.json` with a new key in the format `sk-local-<hex>`.
-
-**Never commit `key.json` to git.** It is in `.gitignore` by default.
-
-### Permission Mode
-
-Control what the agent is allowed to do by setting the `ZONNY_MODE` environment variable:
-
-```bash
-# Windows
-set ZONNY_MODE=dev     # default: read + write to code files
-
-# macOS/Linux
-export ZONNY_MODE=dev
-```
-
-See [Permission Modes](#permission-modes) for details.
-
-### Model
-
-The default model is `nemotron-3-nano:latest`. To change it, edit the `MODEL` constant in:
-- `orchestrator.py`
-- `zonny/runtime.py` (if present)
-
-Any model available in your local Ollama installation works.
+This creates a `key.json` file with a key in the format `sk-local-<hex>`. Keep this key -- you will need it when using the API or web interface.
 
 ---
 
-## Usage
+## Starting the Server
 
-### Interactive CLI
-
-Make sure Ollama is running (`ollama serve`), then:
+Make sure Ollama is running first. If it is not running, start it:
 
 ```bash
-zonny
+ollama serve
 ```
 
-You'll see the Zonny banner. Type a message to start chatting, or use commands:
+Then start the Zonny server:
 
+**Windows (PowerShell):**
+```powershell
+venv\Scripts\uvicorn.exe server:app --host 0.0.0.0 --port 8000
 ```
-/agents    List available agents and their capabilities
-/help      Show command reference
-/exit      Exit Zonny
+
+**macOS / Linux:**
+```bash
+uvicorn server:app --host 0.0.0.0 --port 8000
 ```
+
+The server will start and print output like:
+```
+INFO:     Started server process
+INFO:     Uvicorn running on http://0.0.0.0:8000
+```
+
+Open your browser and go to **http://localhost:8000** to access the web interface.
+
+---
+
+## Using the Web Interface
+
+The web interface has five tabs. Here is what each one does and how to use it.
+
+### Chat Tab
+
+This is a conversation interface where you can ask questions and get answers from the AI agents.
+
+**How to use:**
+1. Type a message in the input box at the bottom
+2. Press Enter or click Send
+3. The system routes your question to the best specialist agent (code, documents, memory, or general)
+4. The specialist analyses your question, then an assistant agent synthesises the final response
 
 **Example prompts:**
-```
-> go through this project and explain what it does
-> read package.json and tell me the dependencies
-> write a function that parses JSON from a file
-> what files are in the src/ directory?
-```
+- "Explain what this project does"
+- "Read server.py and summarise the endpoints"
+- "Write a Python function that validates email addresses"
 
-### Start the REST Server
+The left sidebar shows the available agents and their assigned models. The right sidebar shows details about each agent's activity.
+
+### Agent Log Tab
+
+This tab shows the full internal conversation between agents. When you send a message in the Chat tab, you can switch to Agent Log to see how the router picked a specialist and how the agents worked together to produce the answer.
+
+This is useful for understanding how the multi-agent system works and for debugging when responses are not what you expected.
+
+### IDE Tab
+
+A full code editor and terminal, similar to VS Code, running in your browser.
+
+**Components:**
+- **File Explorer** (left panel) -- Browse directories, click files to open them
+- **Editor** (main panel) -- Syntax-highlighted code editor with multiple tabs. Supports all common languages (Python, JavaScript, HTML, CSS, JSON, YAML, etc.)
+- **Terminal** (bottom panel) -- A real PowerShell (Windows) or Bash (Linux/macOS) terminal
+
+**How to use:**
+1. The file explorer defaults to the `outputs/` directory where generated apps are saved
+2. Click any file to open it in the editor
+3. Edit the code directly
+4. Press Ctrl+S (or Cmd+S on macOS) to save
+5. Use the terminal to run commands like `python main.py` or `npm start`
+
+### Company Tab
+
+This is the Software Company simulator. You describe what you want to build, and six AI agents collaborate to create it.
+
+**The six agents and their roles:**
+
+| Agent | Role | Model |
+|-------|------|-------|
+| CEO | Writes a Product Requirements Document (PRD) from your prompt | nemotron-3-nano |
+| Architect | Designs the system architecture and file structure | nemotron-3-nano |
+| Frontend Engineer | Writes HTML, CSS, and JavaScript code | deepseek-coder:33b |
+| Backend Engineer | Writes Python, API, and server code | deepseek-coder:33b |
+| QA Engineer | Reviews code for bugs and writes test cases | nemotron-3-nano |
+| Reviewer | Final review, produces a ship report, signs off | nemotron-3-nano |
+
+**How to use:**
+1. Type a description of what you want to build (for example: "Build a todo list app with dark mode")
+2. Click the Build button
+3. Watch the pipeline execute -- each agent lights up as it works
+4. Agent output streams in real time on the left panel
+5. Generated files appear in the right panel
+6. When the pipeline finishes, the Preview tab opens automatically
+
+**Tips for better results:**
+- Be specific in your prompt. "Build a todo list app with add, delete, and filter functionality, using HTML/CSS/JS" works better than "build an app."
+- The agents work best for single-page web applications (HTML + CSS + JS)
+- Generated files are saved to `outputs/<session-id>/`
+
+### Preview Tab
+
+This tab shows a live preview of the application built by the Company pipeline.
+
+**Auto-Repair feature:**
+When the preview loads, an error detection script monitors for JavaScript errors. If errors are found:
+
+1. The status badge turns red and shows the number of errors detected
+2. The system automatically sends the error messages and source code to repair agents
+3. The Frontend and Backend engineers analyse the errors and produce fixed code
+4. The preview reloads with the fixed code
+5. This cycle repeats up to 3 times
+
+**Status indicators:**
+- Blue badge: "Loading preview" -- the preview is starting
+- Green badge: "Running" -- the application loaded without errors
+- Yellow badge: "Repairing (1/3)" -- agents are fixing errors (with a pulsing animation)
+- Red badge: "Repair failed after 3 attempts" -- manual intervention needed
+
+**Controls:**
+- Refresh button: Reloads the preview and resets the repair counter
+- New Tab button: Opens the generated application in a full browser tab
+
+---
+
+## Using the CLI
+
+The command-line interface is an alternative to the web UI for terminal-focused workflows.
+
+### Start the CLI
 
 ```bash
-zonny-server
-# or
-python -m uvicorn server:app --reload --port 8000
-```
-
-The server starts at `http://127.0.0.1:8000`. See [REST API Reference](#rest-api-reference) for endpoints.
-
-### Start the MCP Server
-
-```bash
-zonny-mcp
-# or
-python mcp_server.py
-```
-
-See [MCP Integration](#mcp-integration) for Claude Desktop configuration.
-
-### Running from a Specific Directory
-
-Point Zonny at any project directory:
-
-```bash
-cd /path/to/your/project
+# If installed as a package:
 zonny
+
+# Or run directly:
+python zonny.py
 ```
 
-Zonny uses the current working directory as the workspace root. All file operations are sandboxed to this directory.
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `/agents` | List available agents and their capabilities |
+| `/help` | Show the command reference |
+| `/exit` | Exit Zonny |
+
+### Example Session
+
+```
+> Zonny CLI v0.3
+> Type a message or /help for commands.
+
+you> What files are in the current directory?
+
+[SEARCH] Routing to: codebase agent
+[CODE] Scanning workspace...
+
+The current directory contains:
+  server.py (21 KB) -- FastAPI server
+  memory.py (5.8 KB) -- ChromaDB memory
+  orchestrator.py (8 KB) -- Agent orchestration
+  ...
+
+you> Read server.py and explain the endpoints
+
+[CODE] Reading file: server.py
+...
+```
+
+---
+
+## Agent Architecture
+
+Zonny uses two different agent architectures depending on the task.
+
+### Chat Architecture (2-Agent Team)
+
+Used for the Chat tab. A router picks the best specialist, then two agents collaborate:
+
+```
+User question
+  --> Router selects specialist (code / docs / memory / general)
+  --> Specialist agent analyses the question deeply
+  --> Assistant agent synthesises a clean final answer
+  --> Response returned to the user
+```
+
+The team uses `RoundRobinGroupChat` from Microsoft's AutoGen framework. Each agent runs in sequence, and the assistant agent marks the conversation as complete by saying "TERMINATE."
+
+### Company Architecture (6-Agent Pipeline)
+
+Used for the Company tab. Six agents run in a fixed sequence:
+
+```
+User prompt
+  --> CEO: writes product requirements
+  --> Architect: designs system and file structure
+  --> Frontend Engineer: writes client-side code
+  --> Backend Engineer: writes server-side code
+  --> QA Engineer: reviews for bugs and edge cases
+  --> Reviewer: final sign-off, outputs TERMINATE
+```
+
+Code files are extracted from agent output using marker patterns (`// FILE: filename.ext`) and saved to disk.
+
+### Repair Architecture (2-Agent Fix)
+
+Used when the preview detects errors. The Frontend and Backend engineers receive the current source files plus the error messages and produce corrected code.
 
 ---
 
 ## REST API Reference
 
-Base URL: `http://127.0.0.1:8000`
+Base URL: `http://localhost:8000`
 
-All endpoints (except `/`) require an `Authorization` header with an API key from `key.json`.
+All endpoints except `GET /` require an `Authorization` header with an API key.
 
-### Health Check
+### Core Endpoints
 
-```http
-GET /
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | Serves the web interface |
+| POST | `/mcp` | Send a message to the multi-agent chat system |
+| GET | `/stream` | SSE stream of agent activity in real time |
+| GET | `/agents/status` | List all agents with their models and status |
 
-```json
-{ "status": "ok" }
-```
+### Company Endpoints
 
-### MCP Gateway (Main Agent Endpoint)
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/company/stream` | Start a company pipeline (SSE stream) |
+| POST | `/company/repair` | Start a repair cycle (SSE stream) |
+| GET | `/company/files/{session}` | List files generated by a session |
+| GET | `/company/files/{session}/{filename}` | Get a specific generated file |
 
-```http
-POST /mcp
-Authorization: sk-local-<your-key>
-Content-Type: application/json
+### Preview Endpoints
 
-{
-  "session": "uuid-string",
-  "input": "your message here"
-}
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/preview/{session}` | Serve the generated app's HTML (with error detection injected) |
+| GET | `/preview/{session}/{filename}` | Serve static assets (CSS, JS, images) for the previewed app |
+
+### File API (IDE)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/files/read` | Read a file from disk |
+| POST | `/files/write` | Write/save a file to disk |
+| GET | `/files/tree` | Browse directory contents |
+
+### Terminal
+
+| Protocol | Path | Description |
+|----------|------|-------------|
+| WebSocket | `/terminal` | Interactive terminal session (PowerShell or Bash) |
+
+### Legacy Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/v1/chat/completions` | OpenAI-compatible chat endpoint |
+| POST | `/v1/upload` | Upload and index a PDF document |
+
+### Example: Sending a Chat Message
+
+```bash
+curl -X POST http://localhost:8000/mcp \
+  -H "Authorization: sk-local-your-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{"session": "my-session", "input": "What does server.py do?"}'
 ```
 
 Response:
 ```json
 {
-  "response": "Agent's answer",
-  "session": "uuid-string"
+  "response": "server.py is the main FastAPI server...",
+  "session": "my-session"
 }
 ```
 
-### Chat (legacy RAG endpoint)
+### Example: Starting a Company Build
 
-```http
-POST /v1/chat
-Authorization: sk-local-<your-key>
-Content-Type: application/json
-
-{
-  "messages": [
-    { "role": "user", "content": "Your question" }
-  ],
-  "conversation_id": "my-session",
-  "document_id": "optional-doc-id"
-}
+```bash
+curl -X POST http://localhost:8000/company/stream \
+  -H "Authorization: sk-local-your-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{"session": "build-001", "prompt": "Build a calculator app"}'
 ```
 
-### Upload PDF Document
-
-```http
-POST /v1/upload
-Authorization: sk-local-<your-key>
-Content-Type: multipart/form-data
-
-file: <binary PDF>
+This returns a Server-Sent Events stream. Each event is a JSON object:
 ```
-
-Response:
-```json
-{
-  "document_id": "doc-uuid",
-  "chunks": 42,
-  "message": "Document indexed successfully"
-}
-```
-
-### List Agents
-
-```http
-GET /agents
-Authorization: sk-local-<your-key>
+data: {"type": "message", "agent": "CEO_agent", "content": "...", "files_extracted": []}
+data: {"type": "message", "agent": "frontend_engineer", "content": "...", "files_extracted": ["index.html"]}
+data: {"type": "done", "ship_report": "...", "files": {"index.html": "..."}, "saved_paths": ["outputs/build-001/index.html"]}
 ```
 
 ---
 
 ## MCP Integration
 
-Zonny includes a full [Model Context Protocol](https://modelcontextprotocol.io) server, allowing it to be used as a tool source in Claude Desktop and any MCP-compatible client.
+Zonny includes a Model Context Protocol (MCP) server, allowing it to be used as a tool provider in Claude Desktop and other MCP-compatible clients.
 
 ### Claude Desktop Configuration
 
-Add this to your Claude Desktop `claude_desktop_config.json`:
+Add this to your Claude Desktop configuration file (`claude_desktop_config.json`):
 
 ```json
 {
@@ -482,21 +485,7 @@ Add this to your Claude Desktop `claude_desktop_config.json`:
 }
 ```
 
-Or if using the globally installed command:
-
-```json
-{
-  "mcpServers": {
-    "zonny": {
-      "command": "zonny-mcp"
-    }
-  }
-}
-```
-
 ### Available MCP Tools
-
-Once connected, Claude Desktop can use:
 
 | Tool | Description |
 |------|-------------|
@@ -505,101 +494,158 @@ Once connected, Claude Desktop can use:
 | `list_files` | List files and directories |
 | `search_files` | Search file contents by pattern |
 | `write_file` | Write or modify a file |
-| `run_command` | Execute a shell command (full mode) |
+| `run_command` | Execute a shell command (requires full permission mode) |
 | `query_memory` | Search the vector memory store |
 
 ---
 
 ## Permission Modes
 
-Zonny uses a three-tier permission system controlled by the `ZONNY_MODE` environment variable:
+Zonny uses a three-tier permission system. Set the mode using the `ZONNY_MODE` environment variable:
 
-| Mode | Read Files | Write Files | Shell Commands | Use Case |
-|------|-----------|------------|----------------|----------|
-| `safe` | ✅ | ❌ | ❌ | Production, exploratory tasks |
-| `dev` | ✅ | ✅ (restricted extensions) | ❌ | Development (default) |
-| `full` | ✅ | ✅ (all) | ✅ | Advanced / trusted environments |
+```bash
+# Windows PowerShell
+$env:ZONNY_MODE = "dev"
 
-In `dev` mode, the following extensions are writable:
+# macOS / Linux
+export ZONNY_MODE=dev
+```
 
+| Mode | Read Files | Write Files | Shell Commands | When to Use |
+|------|-----------|-------------|----------------|-------------|
+| `safe` | Yes | No | No | Exploring code, asking questions |
+| `dev` | Yes | Yes (code files only) | No | Normal development (default) |
+| `full` | Yes | Yes (all files) | Yes | Trusted environments only |
+
+**Writable extensions in `dev` mode:**
 ```
 .py .js .ts .jsx .tsx .html .css .scss
 .json .yaml .yml .toml .md .txt .sh .env.example
 ```
 
-The following are **always blocked** regardless of mode:
-
+**Always blocked (all modes):**
 ```
 .exe .dll .so .bin .env .key .pem .cert .p12
 ```
 
 ---
 
-## Agent Manifests
+## Configuration
 
-Agents are defined in YAML files under `agents/manifests/`. Each manifest declares the agent's identity, capabilities, and routing behavior.
+### API Key
 
-**Example (`agents/manifests/codebase.yaml`):**
+Generated by `python create_key.py`. Stored in `key.json`. Never commit this file to version control.
+
+### Models
+
+Models are configured in agent manifest files (`agents/manifests/*.yaml`). Each manifest specifies which Ollama model the agent uses:
 
 ```yaml
-name: codebase
-display_name: Codebase Agent
-description: Analyzes, navigates, and edits codebases
-capabilities:
-  - read_files
-  - write_files
-  - analyze_code
-  - search_workspace
-tasks:
-  - explain
-  - summarize
-  - edit
-  - refactor
-  - debug
-priority: high
+name: frontend_engineer
+model: deepseek-coder:33b
+system_prompt: |
+  You are a frontend engineer...
 ```
 
-To add a new agent, create a new YAML manifest and the corresponding Python module in `agents/`.
+To use a different model, change the `model` field in the manifest and make sure the model is pulled in Ollama.
+
+### Ollama Host
+
+By default, Zonny connects to Ollama at `http://localhost:11434`. To change this, set the `OLLAMA_HOST` environment variable:
+
+```bash
+# Windows PowerShell
+$env:OLLAMA_HOST = "http://192.168.1.100:11434"
+
+# macOS / Linux
+export OLLAMA_HOST="http://192.168.1.100:11434"
+```
 
 ---
 
-## Tool Registry
+## Project Structure
 
-All tools register themselves with the central registry (`zonny/tool_registry.py`). This is the single source of truth — the router, dispatcher, and reflection system all reference it.
-
-Each tool entry includes:
-- **Name** — unique identifier
-- **Description** — what the tool does (used by the planner)
-- **Capability tags** — what class of operation this tool performs
-- **Permission requirements** — minimum mode required
-
-The dispatcher enforces registry validation: **if a tool is not in the registry, it cannot be executed.**
-
----
-
-## Memory System
-
-Zonny uses a two-layer memory system:
-
-### 1. In-Session Memory (World State)
-During a ReAct loop, `world.knowledge` accumulates everything observed: file listings, file contents, analysis results, etc. This is ephemeral — it resets when the loop ends.
-
-### 2. Persistent Vector Memory (ChromaDB)
-Conversations and document chunks are stored as embeddings in ChromaDB using `sentence-transformers/all-MiniLM-L6-v2` (running on CPU). This persists across sessions and is queryable semantically.
-
-**Operations:**
-```python
-# Store a message
-store_message(role, content, conversation_id)
-
-# Retrieve relevant memory
-retrieve_memory(query, conversation_id, top_k=5)
-
-# Store document chunks
-store_text_blocks(blocks, document_id)
 ```
+server.py                       Main FastAPI server (all HTTP and WebSocket endpoints)
+orchestrator.py                 RAG + memory orchestration layer
+memory.py                       ChromaDB vector memory interface
+mcp_server.py                   MCP stdio server for Claude Desktop
+zonny.py                        CLI entry point
+zonny_status.py                 Diagnostic test suite (35 checks)
+create_key.py                   API key generator
+setup.py                        Package installer (pip install -e .)
+requirements.txt                Python dependencies
 
-The vector store lives in `chroma_db/` in the project directory. This is excluded from git.
+zonny/                          Core runtime package
+  autogen_runtime.py            Chat mode: 2-agent team (specialist + assistant)
+  company_runtime.py            Company mode: 6-agent pipeline + auto-repair
+  planner.py                    Decision engine (one action per step)
+  dispatcher.py                 Secure OS interface (path safety, permissions)
+  react_loop.py                 ReAct Think-Act-Observe engine
+  reflector.py                  Answer quality evaluation
+  semantic_router.py            Intent routing to agents
+  agent.py                      Base agent implementation
+  memory.py                     Vector memory interface
+  tool_registry.py              Central tool registry
+  executor.py                   Action execution
+  router.py                     Task-level routing
+  world.py                      Immutable world state
+  cli.py                        Interactive terminal UI
+  runtime.py                    Runtime configuration
+
+agents/                         Agent definitions
+  manifests/                    YAML agent configuration files
+    assistant.yaml              Response synthesiser
+    codebase.yaml               Code analysis agent
+    document.yaml               Document Q&A agent
+    generalist.yaml             General fallback agent
+    memory.yaml                 Memory management agent
+    ceo.yaml                    Company: product requirements
+    architect.yaml              Company: system design
+    frontend.yaml               Company: HTML/CSS/JS code
+    backend.yaml                Company: Python/API code
+    qa.yaml                     Company: testing and bugs
+    reviewer.yaml               Company: final review
+  agent_factory.py              Creates agents from manifests
+  manifest_loader.py            Loads and validates YAML manifests
+  base.py, code.py, docs.py,   Specialist agent implementations
+  general.py, memory.py,
+  planner_agent.py, registry.py,
+  router.py
+
+tools/                          Tool implementations
+  fs.py                         Filesystem operations
+  workspace.py                  Workspace scanning
+  analyzer.py                   Code analysis
+  shell.py                      Shell command execution
+  memory_tool.py                Memory search/store
+  vector_tool.py                Vector DB operations
+  file_tool.py                  Extended file operations
+  runner.py                     Command runner
+  registry.py                   Tool registry
+
+runtime/                        Runtime infrastructure
+  engine.py                     Runtime engine
+  subagent.py                   Sub-agent spawning
+  registry.py                   Runtime service registry
+  context.py                    Execution context
+  base.py                       Base runtime class
+
+frontend/                       Web interface (single-page application)
+  index.html                    5-tab layout
+  style.css                     Dark theme, grid layouts, animations
+  app.js                        Editor, terminal, SSE streaming, auto-repair
+
+commands/                       CLI command handlers
+  system.py                     System commands (/help, /agents, etc.)
+
+docs/                           Documentation
+  runbook.md                    Operations runbook
+  model-selection-playbook.md   Guide to choosing models
+  token-optimization-guide.md   Token usage optimisation
+
+outputs/                        Generated application files (per session)
+```
 
 ---
 
@@ -611,237 +657,88 @@ Run the full test suite to verify your installation:
 python zonny_status.py
 ```
 
-This runs 35 checks across all system components:
+This runs 35 automated checks across all system components:
 
-- Ollama connectivity & model availability
-- All package imports
-- Tool registry integrity
-- Agent manifest loading
-- Semantic router
+- Ollama connectivity and model availability
+- All Python package imports
+- Tool registry integrity (17 tools)
+- Agent manifest loading and validation
+- Semantic router (intent classification)
 - ReAct loop execution
-- Dispatcher security (path traversal, extension blocking)
+- Dispatcher security (path traversal prevention, extension blocking)
 - Permission mode enforcement
-- Memory subsystem
+- Memory subsystem (ChromaDB + embeddings)
 - FastAPI server health
 - MCP protocol
 
 Expected output:
 ```
-✅ Passed: 35/35  |  Score: 100%  |  🎉 All systems nominal.
+ [OK] Passed : 35/35
+ [FAIL] Failed : 0/35
+ Score : 100%
+
+ [DONE] All systems nominal. Zonny is ready.
 ```
+
+If any checks fail, the output will tell you exactly what is wrong and how to fix it.
 
 ---
 
 ## Contributing
 
-Contributions are welcome. Zonny is structured to make extension easy:
+Contributions are welcome. Zonny is structured to make extension straightforward.
 
-### To add a new tool
+### Adding a New Tool
+
 1. Create `tools/your_tool.py` with a function
 2. Register it in `zonny/tool_registry.py`
 3. Import it in `tools/__init__.py`
 
-### To add a new agent
-1. Create `agents/manifests/your_agent.yaml`
+### Adding a New Agent
+
+1. Create `agents/manifests/your_agent.yaml` with the agent's configuration
 2. Create `agents/your_agent.py` with the agent logic
 3. Register it in `agents/registry.py`
 
-### To add a new API endpoint
-1. Add the route to `server.py`
-2. Add a corresponding MCP tool in `mcp_server.py` if needed
+### Adding a New API Endpoint
 
-### Code style
+1. Add the route to `server.py`
+2. Add a corresponding MCP tool in `mcp_server.py` if applicable
+
+### Code Standards
+
 - Follow existing patterns in each module
 - Keep each file focused on a single responsibility
 - Add docstrings to public functions
-- Test with `python zonny_status.py` before submitting
+- Run `python zonny_status.py` before submitting and verify all 35 checks pass
 
 ---
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|-----------|
-| LLM Runtime | [Ollama](https://ollama.com) |
-| Default Model | nemotron-3-nano:latest |
-| REST Framework | [FastAPI](https://fastapi.tiangolo.com) |
-| ASGI Server | [Uvicorn](https://www.uvicorn.org) |
-| Vector Store | [ChromaDB](https://www.trychroma.com) |
-| Embeddings | sentence-transformers (all-MiniLM-L6-v2) |
-| MCP Protocol | [mcp Python SDK](https://github.com/modelcontextprotocol/python-sdk) |
-| PDF Parsing | pypdf |
-| Python | ≥ 3.10 |
+| Component | Technology | Purpose |
+|-----------|-----------|---------|
+| Language | Python 3.12 | Core runtime |
+| Web Framework | FastAPI | HTTP server and REST API |
+| ASGI Server | Uvicorn | Serves the FastAPI application |
+| LLM Runtime | Ollama | Runs language models locally |
+| Multi-Agent Framework | AutoGen (Microsoft) | Agent teams and orchestration |
+| Vector Database | ChromaDB | Persistent semantic memory |
+| Embeddings | sentence-transformers (all-MiniLM-L6-v2) | Text-to-vector conversion |
+| Code Editor | Monaco Editor (CDN) | VS Code engine for the browser |
+| Terminal Emulator | xterm.js (CDN) | Browser-based terminal |
+| PDF Parsing | pypdf | Document ingestion |
+| MCP Protocol | mcp Python SDK | Claude Desktop integration |
 
----
+### Models Used
 
-## Roadmap
-
-Zonny is actively evolving. The following features are planned for upcoming releases. Each item below represents a meaningful architectural expansion — not incremental tweaks — and is scoped to ensure Zonny remains cohesive, well-tested, and production-ready.
-
----
-
-### 1. Multi-Provider LLM Support (Cloud API Integration)
-
-**Priority: High | Target: v0.3.0**
-
-Zonny is currently built around Ollama for fully local execution. The next major milestone is adding first-class support for **Anthropic Claude**, **Google Gemini**, and **OpenAI GPT** as swappable LLM backends — while keeping local Ollama as the default.
-
-#### What will be built
-
-- A unified `LLMProvider` abstraction layer in `zonny/providers/` that normalises the request/response contract across all backends:
-  ```
-  zonny/providers/
-  ├── base.py          # Abstract LLMProvider interface
-  ├── ollama.py        # Current Ollama backend (refactored in)
-  ├── openai.py        # OpenAI GPT-4o, GPT-4.1, o3, o4-mini
-  ├── anthropic.py     # Claude 3.5 Sonnet, Claude 4 Sonnet/Opus
-  ├── gemini.py        # Gemini 2.0 Flash, Gemini 2.5 Pro
-  └── registry.py      # Provider selection & fallback logic
-  ```
-- API key management via environment variables (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`) with optional encrypted storage in a local keychain
-- A provider config section in `.zonny.json` (project-level) and `~/.zonny/config.json` (global):
-  ```json
-  {
-    "provider": "anthropic",
-    "model": "claude-sonnet-4-5",
-    "fallback_provider": "ollama",
-    "fallback_model": "nemotron-3-nano:latest"
-  }
-  ```
-- Automatic fallback: if the cloud provider is unreachable (no key, rate-limited, network error), Zonny falls back to the configured local Ollama model — keeping the agent functional offline
-- Per-session provider override: `zonny --provider openai --model gpt-4o`
-- Streaming support across all providers so terminal output remains responsive on long responses
-- Token usage tracking and cost estimation per session (printed in verbose mode)
-
-#### Why this matters
-
-Developers working on sensitive internal code can stay fully local. Developers who want frontier reasoning on complex tasks (long context analysis, architecture review, refactoring large codebases) can switch to a cloud provider without changing workflows or commands.
-
----
-
-### 2. Web Dashboard
-
-**Priority: High | Target: v0.4.0**
-
-The current Zonny interface is terminal-only. While the CLI is intentional and will remain the primary interface, a **browser-based dashboard** will make Zonny accessible to developers who prefer a visual environment and enable use cases that the CLI cannot serve well (conversation history browsing, document management, live session monitoring).
-
-#### What will be built
-
-- A self-hosted web UI served directly by `zonny-server` (no separate process needed), accessible at `http://localhost:8000/ui`
-- Built with a lightweight frontend stack (likely **React + Vite + TailwindCSS**) compiled to a static bundle and embedded in the Python package
-
-**Dashboard panels:**
-
-| Panel | Description |
-|-------|-------------|
-| **Chat** | Full-featured chat interface — send messages, view streamed agent responses, see tool call logs inline |
-| **Sessions** | Browse, search, resume, rename, and delete past sessions. Session summaries shown alongside. |
-| **Documents** | Upload, manage, and query PDFs and text files ingested into the vector store |
-| **Memory** | View and edit the persistent vector memory — browse stored facts, delete entries, add manual notes |
-| **Agent Monitor** | Live view of the ReAct loop as it executes — each Think/Act/Observe step visible in real time |
-| **Provider Settings** | Configure LLM provider, model, API keys, and permission mode without editing config files |
-| **Tool Log** | Per-session audit log of every tool the agent invoked, with inputs, outputs, and timing |
-
-- WebSocket endpoint (`/ws/session/{id}`) for live streaming of agent loop steps to the dashboard
-- Dark mode by default; system-preference aware
-- Fully functional without JavaScript (graceful degradation) for accessibility
-
-#### Why this matters
-
-The dashboard lowers the barrier to entry for developers new to agent runtimes, makes session management practical at scale, and turns Zonny into a tool that non-terminal users (designers, PMs, QA engineers) can also use productively.
-
----
-
-### 3. Automated Code Review Agent (PR Review)
-
-**Priority: Medium | Target: v0.5.0**
-
-Zonny will gain a dedicated **Code Review Agent** — a specialised agent that performs deep, context-aware analysis of code changes and delivers structured pull request reviews. This is more than a linting wrapper: it uses the full ReAct loop to reason about the intent of a change, cross-reference it against the existing codebase, and produce actionable, prioritised feedback.
-
-#### What will be built
-
-- A new agent manifest and implementation (`agents/manifests/reviewer.yaml`, `agents/reviewer.py`)
-- A `zonny review` CLI command:
-  ```bash
-  # Review uncommitted changes
-  zonny review
-
-  # Review a specific branch against main
-  zonny review --branch feature/my-feature --base main
-
-  # Review a GitHub PR by URL
-  zonny review --pr https://github.com/org/repo/pull/42
-
-  # Output as JSON for CI integration
-  zonny review --format json > review.json
-  ```
-- A new `tools/git_diff.py` tool that extracts structured diffs (file path, hunk, context lines, added/removed line counts)
-- A `tools/github.py` tool for authenticated GitHub API access — fetching PR metadata, posting comments, and requesting changes programmatically
-
-**Review output structure** (Markdown and JSON):
-```
-## Code Review — feature/auth-refactor
-
-### Summary
-This PR refactors the authentication layer from session-based to JWT. The
-logic is sound but several edge cases and security considerations need
-addressing before merge.
-
-### Issues Found
-
-#### 🔴 Critical (1)
-- **`auth/jwt.py:47`** — JWT secret falls back to a hardcoded string when
-  `JWT_SECRET` env var is unset. This will silently use an insecure default
-  in production. Require the env var or raise on startup.
-
-#### 🟡 Warnings (3)
-- **`auth/middleware.py:23`** — Token expiry is not validated on refresh.
-  An expired token can be refreshed indefinitely.
-- **`tests/test_auth.py`** — No test covers the token expiry path.
-- **`api/routes.py:89`** — `user_id` extracted from token is not validated
-  against the database before use. Could allow access with a valid token for
-  a deleted user.
-
-#### 🔵 Suggestions (2)
-- Consider extracting token validation into a shared utility to avoid
-  duplication across middleware and route guards.
-- The `logout` endpoint does not invalidate the token server-side.
-  Consider a token denylist for sensitive deployments.
-
-### Test Coverage Delta
-Lines added: 312 | Lines with tests: 189 | Coverage delta: -4.2%
-Recommendation: Add tests for the expiry and refresh paths.
-```
-
-- **CI/CD integration**: Output a non-zero exit code when critical issues are found, making `zonny review` usable as a GitHub Actions step or pre-merge gate
-- **GitHub Actions workflow template** included in the repo under `.github/workflows/zonny-review.yml`
-- Context-awareness: the agent reads the full codebase (not just the diff) to reason about whether a change is consistent with existing patterns, introduces regressions, or conflicts with other modules
-- Review depth configurable: `--depth quick` (diff only) | `--depth standard` (diff + affected files) | `--depth full` (diff + full codebase context)
-
-#### Why this matters
-
-Code review is one of the highest-leverage activities in software development and also one of the most time-consuming. A local, privacy-preserving review agent means internal code never leaves the machine during review, the model can be tuned to the team's specific standards via the agent manifest, and junior developers get structured feedback immediately — before waiting for a human reviewer.
-
----
-
-### Release Timeline
-
-| Version | Feature | Status |
-|---------|---------|--------|
-| v0.2.0 | ReAct loop, semantic router, dispatcher security, reflection, tool registry, MCP server | ✅ Released |
-| v0.3.0 | Multi-provider LLM support (OpenAI, Anthropic, Gemini) + API key management | 🔜 Planned |
-| v0.4.0 | Web dashboard (chat UI, session management, document manager, live agent monitor) | 🔜 Planned |
-| v0.5.0 | Code Review Agent (PR review, GitHub integration, CI/CD support) | 🔜 Planned |
-| v0.6.0 | Persistent SQLite session storage (conversation history that survives restarts) | 🔜 Planned |
-
-> Feature priorities and timelines may shift based on community feedback. Open an issue to vote on or discuss any roadmap item.
+| Model | Size | Used For |
+|-------|------|----------|
+| nemotron-3-nano:latest | ~2 GB | Chat agents, CEO, Architect, QA, Reviewer |
+| deepseek-coder:33b | ~19 GB | Frontend and Backend code generation |
 
 ---
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
-
----
-
-> Built for developers who want the power of modern AI agents without giving up their privacy or their code.
+This project is open source. See the LICENSE file for details.
